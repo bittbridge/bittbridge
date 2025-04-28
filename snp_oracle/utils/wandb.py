@@ -1,0 +1,63 @@
+import os
+
+import bittensor as bt
+import wandb
+
+from snp_oracle import __version__, constants
+
+
+def setup_wandb(self) -> None:
+    wandb_api_key = os.getenv("WANDB_API_KEY")
+    if wandb_api_key is not None:
+        wandb.init(
+            project=f"sn{self.config.netuid}-validators",
+            entity=constants.WANDB_PROJECT,
+            config={
+                "hotkey": self.wallet.hotkey.ss58_address,
+                "uid": self.my_uid,
+                "subnet_version": __version__,
+            },
+            name=f"validator-{self.my_uid}-{__version__}",
+            resume="auto",
+            dir=self.config.neuron.full_path,
+            reinit=True,
+        )
+    else:
+        bt.logging.error("WANDB_API_KEY not found in environment variables.")
+
+
+def log_wandb(responses, rewards, miner_uids, hotkeys):
+    try:
+        if responses is not None:
+            wandb_val_log = {
+                "miners_info": {
+                    miner_uid: {
+                        "miner_hotkey": hotkeys[miner_uid],
+                        "miner_point_prediction": response.prediction,
+                        "miner_direction_prediction": response.direction,
+                        "miner_reward": rewards.get(miner_uid, 0.0),
+                    }
+                    for miner_uid, response in zip(miner_uids, responses)
+                },
+            }
+
+            bt.logging.trace(f"Attempting to log data to wandb: {wandb_val_log}")
+            wandb.log(wandb_val_log)
+        else:
+            wandb_val_log = {
+                "miners_info": {
+                    miner_uid: {
+                        "miner_hotkey": hotkeys[miner_uid],
+                        "miner_point_prediction": None,
+                        "miner_direction_prediction": None,
+                        "miner_reward": rewards.get(miner_uid, 0.0),
+                    }
+                    for miner_uid in miner_uids
+                },
+            }
+
+            bt.logging.trace(f"Attempting to log data to wandb: {wandb_val_log}")
+            wandb.log(wandb_val_log)
+    except Exception as e:
+        bt.logging.error(f"Failed to log to wandb: {str(e)}")
+        bt.logging.error("Full error: ", exc_info=True)
