@@ -17,15 +17,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import typing
+from typing import List, Optional
+
 import bittensor as bt
+import pydantic
 
-# TODO(developer): Rewrite with your protocol definition.
-
-# This is the protocol for the dummy miner and validator.
-# It is a simple request-response protocol where the validator sends a request
-# to the miner, and the miner responds with a dummy response.
-
+# These define the protocol for the Bittensor subnet template.
 # ---- miner ----
 # Example usage:
 #   def dummy( synapse: Dummy ) -> Dummy:
@@ -40,37 +37,35 @@ import bittensor as bt
 #   assert dummy_output == 2
 
 
-class Dummy(bt.Synapse):
+class Challenge(bt.Synapse):
     """
-    A simple dummy protocol representation which uses bt.Synapse as its base.
-    This protocol helps in handling dummy request and response communication between
-    the miner and the validator.
-
-    Attributes:
-    - dummy_input: An integer value representing the input request sent by the validator.
-    - dummy_output: An optional integer value which, when filled, represents the response from the miner.
+    Challenge Synapse: 
+    Used by validators to request a USDT/CNY price prediction for a given timestamp.
+    Miners respond with a point estimate and an optional prediction interval.
     """
-
+    
     # Required request input, filled by sending dendrite caller.
-    dummy_input: int
+    timestamp: str = pydantic.Field(
+        ...,
+        title="Timestamps",
+        description="The timestamp to predict from",
+        allow_mutation=False,
+    )
 
-    # Optional request output, filled by receiving axon.
-    dummy_output: typing.Optional[int] = None
+    # Optional request output, filled by recieving axon.
+    prediction: Optional[float] = pydantic.Field(
+        default=None,
+        title="Predictions",
+        description="The predictions to send to the dendrite caller",
+    )
+
+    # Optional request output, filled by recieving axon.
+    interval: Optional[List[float]] = pydantic.Field(
+        default=None,
+        title="Interval",
+        description="The predicted interval for the next hour. Formatted as [min, max]",
+    )
 
     def deserialize(self) -> int:
-        """
-        Deserialize the dummy output. This method retrieves the response from
-        the miner in the form of dummy_output, deserializes it and returns it
-        as the output of the dendrite.query() call.
-
-        Returns:
-        - int: The deserialized response, which in this case is the value of dummy_output.
-
-        Example:
-        Assuming a Dummy instance has a dummy_output value of 5:
-        >>> dummy_instance = Dummy(dummy_input=4)
-        >>> dummy_instance.dummy_output = 5
-        >>> dummy_instance.deserialize()
-        5
-        """
-        return self.dummy_output
+        # Return the point estimate prediction for scoring
+        return self.prediction

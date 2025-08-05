@@ -18,15 +18,51 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
+import requests
+from typing import Tuple
 import typing
 import bittensor as bt
 
 # Bittensor Miner Template:
-import template
+import bittbridge
 
 # import base miner class which takes care of most of the boilerplate
-from template.base.miner import BaseMinerNeuron
+from bittbridge.base.miner import BaseMinerNeuron
 
+# ---------------------------
+# Miner Forward Logic for USDT/CNY Prediction
+# ---------------------------
+# This implementation is used inside the `forward()` method of the miner neuron.
+# When a validator sends a Challenge synapse, this code:
+#   1. Fetches the current USDT/CNY price from CoinGecko API.
+#   2. Sets that price as the prediction.
+#   3. Estimates a 90% confidence interval using a naive volatility model.
+#   4. Attaches the prediction and interval to the synapse and returns it.
+#
+# Validators will later use this to score the miner's accuracy.
+
+# Fetch the current price of USDT in CNY using CoinGecko's public API.
+
+def fetch_current_usdt_cny() -> float:
+    try:
+        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny")
+        response.raise_for_status()  # Raise exception for HTTP errors (4xx/5xx)
+        return response.json()["tether"]["cny"]
+    except Exception as e:
+        # Log a warning and return None if API call fails
+        bt.logging.warning(f"API error: {e}")
+        return None
+
+# Estimate a naive 90% confidence interval based on a fixed 1% volatility assumption
+def estimate_interval(prediction: float) -> Tuple[float, float]:
+    std_dev = 0.01  # Assume 1% standard deviation in price
+    # Use 1.64 as z-score for 90% confidence in a normal distribution
+    lower = prediction - 1.64 * std_dev * prediction
+    upper = prediction + 1.64 * std_dev * prediction
+    return lower, upper
+
+# This function is triggered when a validator queries this miner.
+# It processes the synapse by providing a prediction and interval.
 
 class Miner(BaseMinerNeuron):
     """
@@ -42,29 +78,31 @@ class Miner(BaseMinerNeuron):
 
         # TODO(developer): Anything specific to your use case you can do here
 
-    async def forward(
-        self, synapse: template.protocol.Dummy
-    ) -> template.protocol.Dummy:
+    async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
-        Processes the incoming 'Dummy' synapse by performing a predefined operation on the input data.
-        This method should be replaced with actual logic relevant to the miner's purpose.
-
-        Args:
-            synapse (template.protocol.Dummy): The synapse object containing the 'dummy_input' data.
-
-        Returns:
-            template.protocol.Dummy: The synapse object with the 'dummy_output' field set to twice the 'dummy_input' value.
-
-        The 'forward' function is a placeholder and should be overridden with logic that is appropriate for
-        the miner's intended operation. This method demonstrates a basic transformation of input data.
+        Responds to the Challenge synapse from the validator by submitting:
+        - a USDT/CNY price prediction (currently just the real-time value)
+        - a naive confidence interval based on fixed volatility assumption
         """
-        # TODO(developer): Replace with actual implementation logic.
-        synapse.dummy_output = synapse.dummy_input * 2
+        
+        # Step 1: Fetch the most recent USDT/CNY price
+        price = fetch_current_usdt_cny()
+        
+        # Step 2: If the price couldn't be fetched, skip this round
+        if price is None:
+            return synapse  # prediction and interval remain None (validator will ignore)
+
+        # Step 3: Assign point prediction
+        synapse.prediction = price
+
+        # Step 4: Estimate and assign confidence interval
+        synapse.interval = list(estimate_interval(price))
+
+        # Step 5: Log successful prediction
+        bt.logging.success(f"Predicted: {price}, Interval: {synapse.interval}")
         return synapse
 
-    async def blacklist(
-        self, synapse: template.protocol.Dummy
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -126,7 +164,7 @@ class Miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def priority(self, synapse: template.protocol.Dummy) -> float:
+    async def priority(self, synapse: bittbridge.protocol.Challenge) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.
