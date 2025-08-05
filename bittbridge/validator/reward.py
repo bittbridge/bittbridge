@@ -16,40 +16,57 @@
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+import requests
 import numpy as np
-from typing import List
 import bittensor as bt
+from typing import List
+
+from bittbridge.protocol import Challenge
 
 
-def reward(query: int, response: int) -> float:
+def get_actual_usdt_cny() -> float:
+    try:
+        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny")
+        response.raise_for_status()
+        return response.json()["tether"]["cny"]
+    except Exception as e:
+        bt.logging.warning(f"Failed to fetch ground truth price: {e}")
+        return None
+
+
+def reward(actual_price: float, predicted_price: float) -> float:
     """
-    Reward the miner response to the dummy request. This method returns a reward
-    value for the miner, which is used to update the miner's score.
-
-    Returns:
-    - float: The reward value for the miner.
-    """
-    bt.logging.info(
-        f"In rewards, query val: {query}, response val: {response}, rewards val: {1.0 if response == query * 2 else 0}"
-    )
-    return 1.0 if response == query * 2 else 0
-
-
-def get_rewards(
-    self,
-    query: int,
-    responses: List[float],
-) -> np.ndarray:
-    """
-    Returns an array of rewards for the given query and responses.
+    Computes reward based on closeness of predicted price to actual price.
 
     Args:
-    - query (int): The query sent to the miner.
-    - responses (List[float]): A list of responses from the miner.
+        actual_price: Current ground truth USDT/CNY price
+        predicted_price: Miner’s prediction
 
     Returns:
-    - np.ndarray: An array of rewards for the given query and responses.
+        float: Reward value (closer = higher, max 1.0)
     """
-    # Get all the reward results by iteratively calling your reward() function.
+    error = abs(predicted_price - actual_price)
+    reward_val = max(0.0, 1.0 - error / actual_price)  # Linear inverse error
+    bt.logging.info(f"Prediction: {predicted_price}, Actual: {actual_price}, Error: {error}, Reward: {reward_val:.4f}")
+    return reward_val
 
-    return np.array([reward(query, response) for response in responses])
+
+def get_rewards(self, query, responses: List[Challenge]) -> np.ndarray:
+    """
+    Generate a reward for each miner response to the Challenge synapse.
+
+    Args:
+        query: Placeholder for future use (e.g., timestamp)
+        responses: List of Challenge synapse responses from miners
+
+    Returns:
+        np.ndarray of reward floats
+    """
+    actual_price = get_actual_usdt_cny()
+    if actual_price is None:
+        return np.zeros(len(responses))  # No rewards if we can’t validate
+
+    return np.array([
+        reward(actual_price, synapse.prediction) if synapse.prediction is not None else 0.0
+        for synapse in responses
+    ])

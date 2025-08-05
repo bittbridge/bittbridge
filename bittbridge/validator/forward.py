@@ -18,8 +18,9 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
-import bittensor as bt
+from datetime import datetime
 
+import bittensor as bt
 from bittbridge.protocol import Challenge
 from bittbridge.validator.reward import get_rewards
 from bittbridge.utils.uids import get_random_uids
@@ -27,37 +28,40 @@ from bittbridge.utils.uids import get_random_uids
 
 async def forward(self):
     """
-    The forward function is called by the validator every time step.
-
-    It is responsible for querying the network and scoring the responses.
-
-    Args:
-        self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
-
+    Called by the validator every cycle.
+    Steps:
+    1. Generate a current timestamp for prediction.
+    2. Select miners to query.
+    3. Query miners using dendrite with the Challenge synapse.
+    4. Score responses based on how close predictions are to the current price.
+    5. Update miner scores.
     """
-    # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-    # get_random_uids is an example method, but you can replace it with your own.
-    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+    # Step 1: Generate timestamp
+    timestamp = datetime.utcnow().isoformat()
 
-    # The dendrite client queries the network.
+    # Step 2: Select miners (k comes from self.config.neuron.sample_size)
+    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+    selected_axons = [self.metagraph.axons[uid] for uid in miner_uids]
+
+    # Step 3: Build challenge synapse
+    challenge = Challenge(timestamp=timestamp)
+
+    # Step 4: Query miners
     responses = await self.dendrite(
-        # Send the query to selected miner axons in the network.
-        axons=[self.metagraph.axons[uid] for uid in miner_uids],
-        # Construct a dummy query. This simply contains a single integer.
-        synapse=Challenge(dummy_input=self.step),
-        # All responses have the deserialize function called on them before returning.
-        # You are encouraged to define your own deserialization function.
-        deserialize=True,
+        axons=selected_axons,
+        synapse=challenge,
+        deserialize=True
     )
 
-    # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {responses}")
+    bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
+    bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
 
-    # TODO(developer): Define how the validator scores responses.
-    # Adjust the scores based on responses from miners.
-    rewards = get_rewards(self, query=self.step, responses=responses)
+    for i, response in enumerate(responses):
+        bt.logging.info(f"[RESPONSE {i}] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
 
-    bt.logging.info(f"Scored responses: {rewards}")
-    # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.
+    # Step 5: Score responses (immediate scoring for now)
+    rewards = get_rewards(self, timestamp, responses)
+
+    # Step 6: Update scores
     self.update_scores(rewards, miner_uids)
     time.sleep(5)

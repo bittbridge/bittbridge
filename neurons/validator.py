@@ -42,15 +42,10 @@ class Validator(BaseValidatorNeuron):
 
     async def forward(self):
         """
-        Validator forward pass. Consists of:
-        - Generating the query
-        - Querying the miners
-        - Getting the responses
-        - Rewarding the miners
-        - Updating the scores
+        The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         # TODO(developer): Rewrite this function based on your protocol definition.
-        return await forward(self)
+        return await forward.forward(self)
 
 
 # The main function parses the configuration and runs the validator.
