@@ -45,7 +45,7 @@ class Validator(BaseValidatorNeuron):
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         # TODO(developer): Rewrite this function based on your protocol definition.
-        return await forward.forward(self)
+        return await forward(self)
 
 
 # The main function parses the configuration and runs the validator.

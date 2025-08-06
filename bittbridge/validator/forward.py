@@ -50,7 +50,7 @@ async def forward(self):
     responses = await self.dendrite(
         axons=selected_axons,
         synapse=challenge,
-        deserialize=True
+        deserialize=False
     )
 
     bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
