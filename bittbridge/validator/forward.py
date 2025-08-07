@@ -37,7 +37,7 @@ async def forward(self):
     5. Update miner scores.
     """
     # Step 1: Generate timestamp
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(datetime.UTC).isoformat()
 
     # Step 2: Select miners (k comes from self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
