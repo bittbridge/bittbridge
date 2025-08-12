@@ -45,7 +45,7 @@ from bittbridge.base.miner import BaseMinerNeuron
 
 def fetch_current_usdt_cny() -> float:
     try:
-        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny")
+        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key=CG-1UpuR3vjuAqQWJTQo3EPdUmR")
         response.raise_for_status()  # Raise exception for HTTP errors (4xx/5xx)
         return response.json()["tether"]["cny"]
     except Exception as e:
