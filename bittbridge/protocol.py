@@ -18,37 +18,29 @@
 # DEALINGS IN THE SOFTWARE.
 
 from typing import List, Optional
-
+import uuid
 import bittensor as bt
 import pydantic
-
-# These define the protocol for the Bittensor subnet template.
-# ---- miner ----
-# Example usage:
-#   def dummy( synapse: Dummy ) -> Dummy:
-#       synapse.dummy_output = synapse.dummy_input + 1
-#       return synapse
-#   axon = bt.axon().attach( dummy ).serve(netuid=...).start()
-
-# ---- validator ---
-# Example usage:
-#   dendrite = bt.dendrite()
-#   dummy_output = dendrite.query( Dummy( dummy_input = 1 ) )
-#   assert dummy_output == 2
-
 
 class Challenge(bt.Synapse):
     """
     Challenge Synapse: 
     Used by validators to request a USDT/CNY price prediction for a given timestamp.
     Miners respond with a point estimate and an optional prediction interval.
+    Ask miners to predict the price at target_timestamp (UTC ISO8601). 
     """
+    challenge_id: str = pydantic.Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        title="Challenge ID",
+        description="Unique id to link responses with later verification.",
+        allow_mutation=False,
+    )
     
-    # Required request input, filled by sending dendrite caller.
-    timestamp: str = pydantic.Field(
+    # target to predict (validator sets this to now+60s)
+    target_timestamp: str = pydantic.Field(
         ...,
-        title="Timestamps",
-        description="The timestamp to predict from",
+        title="Target Timestamp",
+        description="ISO8601 UTC timestamp the miner should predict for",
         allow_mutation=False,
     )
 
