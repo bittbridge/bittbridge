@@ -19,14 +19,13 @@
 
 
 import time
+import asyncio
+from datetime import datetime, timedelta, timezone
 
-# Bittensor
+# import bittensor
 import bittensor as bt
-
 # import base validator class which takes care of most of the boilerplate
 from bittbridge.base.validator import BaseValidatorNeuron
-
-# Bittensor Validator Template:
 from bittbridge.validator import forward
 
 
@@ -34,11 +33,10 @@ class Validator(BaseValidatorNeuron):
 
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
-
+        self.pending = {}            # challenge_id -> dict with uids, responses, target_dt
+        self.pending_lock = asyncio.Lock()
         bt.logging.info("load_state()")
         self.load_state()
-
-        # TODO(developer): Anything specific to your use case you can do here
 
     async def forward(self):
         """
