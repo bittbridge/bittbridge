@@ -66,6 +66,6 @@ class Challenge(bt.Synapse):
         description="The predicted interval for the next hour. Formatted as [min, max]",
     )
 
-    def deserialize(self) -> int:
+    def deserialize(self) -> float:
         # Return the point estimate prediction for scoring
         return self.prediction

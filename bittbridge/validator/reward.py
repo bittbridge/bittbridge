@@ -26,7 +26,7 @@ from bittbridge.protocol import Challenge
 
 def get_actual_usdt_cny() -> float:
     try:
-        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&x_cg_demo_api_key=CG-1UpuR3vjuAqQWJTQo3EPdUmR")
+        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key=CG-1UpuR3vjuAqQWJTQo3EPdUmR")
         response.raise_for_status()
         return response.json()["tether"]["cny"]
     except Exception as e:
