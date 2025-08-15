@@ -29,19 +29,21 @@ import bittbridge
 # import base miner class which takes care of most of the boilerplate
 from bittbridge.base.miner import BaseMinerNeuron
 
-# ---------------------------
-# Miner Forward Logic for USDT/CNY Prediction
-# ---------------------------
-# This implementation is used inside the `forward()` method of the miner neuron.
-# When a validator sends a Challenge synapse, this code:
-#   1. Fetches the current USDT/CNY price from CoinGecko API.
-#   2. Sets that price as the prediction.
-#   3. Estimates a 90% confidence interval using a naive volatility model.
-#   4. Attaches the prediction and interval to the synapse and returns it.
-#
-# Validators will later use this to score the miner's accuracy.
+'''
+---------------------------
+Miner Forward Logic for USDT/CNY Prediction
+---------------------------
+This implementation is used inside the `forward()` method of the miner neuron.
+When a validator sends a Challenge synapse, this code:
+  1. Fetches the current USDT/CNY price from CoinGecko API.
+  2. Sets that price as the prediction.
+  3. Estimates a 90% confidence interval using a naive volatility model.
+  4. Attaches the prediction and interval to the synapse and returns it.
 
-# Fetch the current price of USDT in CNY using CoinGecko's public API.
+Validators will later use this to score the miner's accuracy.
+
+Fetch the current price of USDT in CNY using CoinGecko's public API.
+'''
 
 def fetch_current_usdt_cny() -> float:
     try:
@@ -84,6 +86,7 @@ class Miner(BaseMinerNeuron):
         - a USDT/CNY price prediction (currently just the real-time value)
         - a naive confidence interval based on fixed volatility assumption
         """
+        target_ts = synapse.target_timestamp  # future use
         
         # Step 1: Fetch the most recent USDT/CNY price
         price = fetch_current_usdt_cny()
@@ -99,7 +102,7 @@ class Miner(BaseMinerNeuron):
         synapse.interval = list(estimate_interval(price))
 
         # Step 5: Log successful prediction
-        bt.logging.success(f"Predicted: {price}, Interval: {synapse.interval}")
+        bt.logging.success(f"Predicted: {price} for target {target_ts}, Interval: {synapse.interval}")
         return synapse
 
     async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:
