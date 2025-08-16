@@ -28,21 +28,33 @@ import bittensor as bt
 from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
+CYCLE_PERIOD_SEC = 60  # <-- one cycle every 1 minute
 
 class Validator(BaseValidatorNeuron):
 
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
-        self.pending = {}            # challenge_id -> dict with uids, responses, target_dt
+        self.pending = {} # challenge_id -> dict with uids, responses, target_dt
         self.pending_lock = asyncio.Lock()
+        self._next_fire_at = 0.0          # monotonic timestamp when next cycle is allowed
+        
         bt.logging.info("load_state()")
         self.load_state()
 
     async def forward(self):
         """
-        The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
+        The forward pass for the validator
+        Delegates logic to bittbridge.validator.forward().
+        Only run a full cycle when the gate is open
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
+        now = time.monotonic()
+        if now < self._next_fire_at:
+            # Tiny sleep avoids hot loop while waiting for the next window.
+            await asyncio.sleep(0.2)
+            return
+
+        # Open the window for this cycle and schedule the next one.
+        self._next_fire_at = now + CYCLE_PERIOD_SEC
         return await forward(self)
 
 
