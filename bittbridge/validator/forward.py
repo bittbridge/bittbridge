@@ -18,6 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
+import asyncio
 from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
@@ -27,13 +28,16 @@ from bittbridge.utils.uids import get_random_uids
 
 async def forward(self):
     """
-    Called by the validator every cycle.
+    Called by the validator every cycle
     Steps:
-    1. Generate a current timestamp for prediction.
-    2. Select miners to query.
-    3. Query miners using dendrite with the Challenge synapse.
-    4. Score responses based on how close predictions are to the current price.
-    5. Update miner scores.
+    1. Generate a current timestamp for prediction
+    2. Select miners to query
+    3. Build a Challenge synapse with the timestamp
+    4. Query miners
+    5. Store responses and timestamp
+    6. Wait for a minute before evaluating miner predictions
+    7. Score responses based on how close predictions are to the current price. 
+    8. Update miner scores
     """
     # Step 1: Generate timestamp
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -51,6 +55,14 @@ async def forward(self):
         synapse=challenge,
         deserialize=False
     )
+    
+    # Step 5: Store responses and timestamp
+    pending_evaluation = {
+        "timestamp": timestamp,
+        "responses": responses,
+        "miner_uids": miner_uids
+    }
+    # -------------------------------------
 
     bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
     bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
@@ -58,9 +70,13 @@ async def forward(self):
     for i, response in enumerate(responses):
         bt.logging.info(f"[RESPONSE {i}] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
 
-    # Step 5: Score responses
-    bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
-    rewards = get_rewards(self, timestamp, responses)
+    # Step 6: Wait before evaluating
+    bt.logging.info("Waiting 1 minute before evaluating miner predictions...")
+    await asyncio.sleep(60)
 
-    # Step 6: Update scores
-    self.update_scores(rewards, miner_uids)
+    # Step 7: Score responses
+    bt.logging.debug(f"Calculating rewards for timestamp: {pending_evaluation['timestamp']}")
+    rewards = get_rewards(self, pending_evaluation["timestamp"], pending_evaluation["responses"])
+
+    # Step 8: Update scores
+    self.update_scores(rewards, pending_evaluation["miner_uids"])
