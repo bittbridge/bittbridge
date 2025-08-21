@@ -18,8 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
-from datetime import datetime
-
+from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
 from bittbridge.validator.reward import get_rewards
@@ -37,7 +36,7 @@ async def forward(self):
     5. Update miner scores.
     """
     # Step 1: Generate timestamp
-    timestamp = datetime.now(datetime.UTC).isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     # Step 2: Select miners (k comes from self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
@@ -59,9 +58,9 @@ async def forward(self):
     for i, response in enumerate(responses):
         bt.logging.info(f"[RESPONSE {i}] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
 
-    # Step 5: Score responses (immediate scoring for now)
+    # Step 5: Score responses
+    bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     rewards = get_rewards(self, timestamp, responses)
 
     # Step 6: Update scores
     self.update_scores(rewards, miner_uids)
-    time.sleep(5)
