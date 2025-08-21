@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-
+import asyncio
 import time
 
 # Bittensor
@@ -29,6 +29,9 @@ from bittbridge.base.validator import BaseValidatorNeuron
 # Bittensor Validator Template:
 from bittbridge.validator import forward
 
+# Reward calculation utilities
+from bittbridge.validator.reward import get_actual_usdt_cny, reward
+
 
 class Validator(BaseValidatorNeuron):
 
@@ -37,19 +40,38 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-
-        # TODO(developer): Anything specific to your use case you can do here
+        self.prediction_queue = []  # Store pending predictions here
 
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
         return await forward(self)
-
-
-# The main function parses the configuration and runs the validator.
-if __name__ == "__main__":
-    with Validator() as validator:
+  
+    async def evaluation_loop(self, evaluation_delay=60, check_interval=5):
         while True:
-            pass
+            now = time.time()
+            ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+            for pred in ready:
+                actual = get_actual_usdt_cny()
+                if actual is not None and pred["prediction"] is not None:
+                    reward_val = reward(actual, pred["prediction"])
+                    self.update_scores([reward_val], [pred["miner_uid"]])
+                    bt.logging.info(f"[EVAL] UID={pred['miner_uid']}, Prediction={pred['prediction']}, Actual={actual}, Reward={reward_val}")
+                self.prediction_queue.remove(pred)
+            await asyncio.sleep(check_interval)
+
+
+async def main():
+    with Validator() as validator:
+        async def prediction_scheduler():
+            while True:
+                await validator.forward()
+                await asyncio.sleep(30)  # 30 seconds between predictions
+
+        eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=60, check_interval=5))
+        pred_task = asyncio.create_task(prediction_scheduler())
+        await asyncio.gather(eval_task, pred_task)
+
+if __name__ == "__main__":
+    asyncio.run(main())
