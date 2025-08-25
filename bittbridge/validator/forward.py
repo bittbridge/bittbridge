@@ -35,9 +35,6 @@ async def forward(self):
     3. Build a Challenge synapse with the timestamp
     4. Query miners
     5. Store responses and timestamp
-    6. Wait for a minute before evaluating miner predictions
-    7. Score responses based on how close predictions are to the current price. 
-    8. Update miner scores
     """
     # Step 1: Generate timestamp
     timestamp = datetime.now(timezone.utc).isoformat()
