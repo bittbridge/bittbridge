@@ -62,16 +62,16 @@ class Validator(BaseValidatorNeuron):
             await asyncio.sleep(check_interval)
 
 
-async def main():
-    with Validator() as validator:
-        async def prediction_scheduler():
-            while True:
-                await validator.forward()
-                await asyncio.sleep(30)  # 30 seconds between predictions
+async def prediction_scheduler(validator):
+    while True:
+        await validator.forward()
+        await asyncio.sleep(30)  # 30 seconds between predictions
 
-        eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=60, check_interval=5))
-        pred_task = asyncio.create_task(prediction_scheduler())
-        await asyncio.gather(eval_task, pred_task)
+async def main():
+    validator = Validator()
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=60, check_interval=5))
+    pred_task = asyncio.create_task(prediction_scheduler(validator))
+    await asyncio.gather(eval_task, pred_task)
 
 if __name__ == "__main__":
     asyncio.run(main())
