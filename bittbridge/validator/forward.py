@@ -22,7 +22,6 @@ import asyncio
 from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
-from bittbridge.validator.reward import get_rewards
 from bittbridge.utils.uids import get_random_uids
 
 
