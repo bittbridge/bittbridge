@@ -48,7 +48,7 @@ class Validator(BaseValidatorNeuron):
         """
         return await forward(self)
   
-    async def evaluation_loop(self, evaluation_delay=60, check_interval=5):
+    async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
@@ -61,7 +61,14 @@ class Validator(BaseValidatorNeuron):
                 self.prediction_queue.remove(pred)
             await asyncio.sleep(check_interval)
 
-
+# Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
+# Ensure that validator see new miners that have joined the network.
+async def metagraph_resync_scheduler(validator, resync_interval=600):
+    while True:
+        validator.resync_metagraph()
+        bt.logging.info("Metagraph resynced.")
+        await asyncio.sleep(resync_interval)
+        
 async def prediction_scheduler(validator):
     while True:
         await validator.forward()
@@ -69,9 +76,10 @@ async def prediction_scheduler(validator):
 
 async def main():
     validator = Validator()
-    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=60, check_interval=5))
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=15, check_interval=5))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
-    await asyncio.gather(eval_task, pred_task)
+    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=10))
+    await asyncio.gather(eval_task , pred_task, resync_task)
 
 if __name__ == "__main__":
     asyncio.run(main())
