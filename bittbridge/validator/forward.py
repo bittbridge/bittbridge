@@ -18,26 +18,25 @@
 # DEALINGS IN THE SOFTWARE.
 
 import time
-from datetime import datetime
-
+import asyncio
+from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
-from bittbridge.validator.reward import get_rewards
 from bittbridge.utils.uids import get_random_uids
 
 
 async def forward(self):
     """
-    Called by the validator every cycle.
+    Called by the validator every cycle
     Steps:
-    1. Generate a current timestamp for prediction.
-    2. Select miners to query.
-    3. Query miners using dendrite with the Challenge synapse.
-    4. Score responses based on how close predictions are to the current price.
-    5. Update miner scores.
+    1. Generate a current timestamp for prediction
+    2. Select miners to query
+    3. Build a Challenge synapse with the timestamp
+    4. Query miners
+    5. Store responses and timestamp
     """
     # Step 1: Generate timestamp
-    timestamp = datetime.now(datetime.UTC).isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     # Step 2: Select miners (k comes from self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
@@ -52,16 +51,29 @@ async def forward(self):
         synapse=challenge,
         deserialize=False
     )
-
-    bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
-    bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
-
+    
+    # Step 5: Store predictions in queue
+    now = time.time()
     for i, response in enumerate(responses):
-        bt.logging.info(f"[RESPONSE {i}] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+        self.prediction_queue.append({
+            "timestamp": timestamp,
+            "miner_uid": miner_uids[i],
+            "prediction": response.prediction,
+            "interval": response.interval,
+            "request_time": now
+        })
+        bt.logging.info(f"[COLLECT] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+        
+    # bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
+    # bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
 
-    # Step 5: Score responses (immediate scoring for now)
-    rewards = get_rewards(self, timestamp, responses)
+    # # Step 6: Wait before evaluating
+    # bt.logging.info("Waiting 1 minute before evaluating miner predictions...")
+    # await asyncio.sleep(60)
 
-    # Step 6: Update scores
-    self.update_scores(rewards, miner_uids)
-    time.sleep(5)
+    # # Step 7: Score responses
+    # bt.logging.debug(f"Calculating rewards for timestamp: {pending_evaluation['timestamp']}")
+    # rewards = get_rewards(self, pending_evaluation["timestamp"], pending_evaluation["responses"])
+
+    # # Step 8: Update scores
+    # self.update_scores(rewards, pending_evaluation["miner_uids"])

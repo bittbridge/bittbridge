@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-
+import asyncio
 import time
 
 # Bittensor
@@ -29,6 +29,19 @@ from bittbridge.base.validator import BaseValidatorNeuron
 # Bittensor Validator Template:
 from bittbridge.validator import forward
 
+# Reward calculation utilities
+from bittbridge.validator.reward import get_actual_usdt_cny, reward
+
+# Timestamp utilities
+from bittbridge.utils.timestamp import (
+    get_now,
+    to_str,
+    to_datetime,
+    is_query_time,
+    round_to_interval,
+    elapsed_seconds,
+    get_before,
+)
 
 class Validator(BaseValidatorNeuron):
 
@@ -37,20 +50,57 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-
-        # TODO(developer): Anything specific to your use case you can do here
+        self.prediction_queue = []  # Store pending predictions here
 
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
         return await forward(self)
+    # Evaluation loop to process predictions after a delay and assign rewards
+    async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
+            while True:
+                now = time.time()
+                ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+                for pred in ready:
+                    actual = get_actual_usdt_cny()
+                    if actual is not None and pred["prediction"] is not None:
+                        reward_val = reward(actual, pred["prediction"])
+                        self.update_scores([reward_val], [pred["miner_uid"]])
+                        bt.logging.info(f"[EVAL] UID={pred['miner_uid']}, Prediction={pred['prediction']}, Actual={actual}, Reward={reward_val}")
+                    self.prediction_queue.remove(pred)
+                await asyncio.sleep(check_interval)
 
 
-# The main function parses the configuration and runs the validator.
+
+# Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
+# Ensure that validator see new miners that have joined the network.
+async def metagraph_resync_scheduler(validator, resync_interval=600):
+    while True:
+        validator.resync_metagraph()
+        bt.logging.info("Metagraph resynced.")
+        await asyncio.sleep(resync_interval)
+        
+async def prediction_scheduler(validator):
+    # Set your prediction interval (in minutes)
+    prediction_interval = 1  # or get from config
+    # Initialize timestamp to current time, rounded to interval
+    timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
+    while True:
+        query_lag = elapsed_seconds(get_now(), to_datetime(timestamp))
+        # Only query if it's the start of a new epoch or lag is too large
+        if is_query_time(prediction_interval, timestamp) or query_lag >= 60 * prediction_interval:
+            await validator.forward()
+            # Update timestamp to the current rounded interval
+            timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
+        await asyncio.sleep(10)  # Check every 10 seconds
+
+async def main():
+    validator = Validator()
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=15, check_interval=5))
+    pred_task = asyncio.create_task(prediction_scheduler(validator))
+    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=10))
+    await asyncio.gather(eval_task , pred_task, resync_task)
+
 if __name__ == "__main__":
-    with Validator() as validator:
-        while True:
-            bt.logging.info(f"Validator running... {time.time()}")
-            time.sleep(5)
+    asyncio.run(main())

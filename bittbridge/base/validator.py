@@ -24,6 +24,7 @@ import asyncio
 import argparse
 import threading
 import bittensor as bt
+import time
 
 from typing import List, Union
 from traceback import print_exception
@@ -157,6 +158,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.sync()
 
                 self.step += 1
+                time.sleep(20)
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:

@@ -51,22 +51,22 @@ def reward(actual_price: float, predicted_price: float) -> float:
     return reward_val
 
 
-def get_rewards(self, query, responses: List[Challenge]) -> np.ndarray:
-    """
-    Generate a reward for each miner response to the Challenge synapse.
+# def get_rewards(self, query, responses: List[Challenge]) -> np.ndarray:
+#     """
+#     Generate a reward for each miner response to the Challenge synapse.
 
-    Args:
-        query: Placeholder for future use (e.g., timestamp)
-        responses: List of Challenge synapse responses from miners
+#     Args:
+#         query: Placeholder for future use (e.g., timestamp)
+#         responses: List of Challenge synapse responses from miners
 
-    Returns:
-        np.ndarray of reward floats
-    """
-    actual_price = get_actual_usdt_cny()
-    if actual_price is None:
-        return np.zeros(len(responses))  # No rewards if we can’t validate
+#     Returns:
+#         np.ndarray of reward floats
+#     """
+#     actual_price = get_actual_usdt_cny()
+#     if actual_price is None:
+#         return np.zeros(len(responses))  # No rewards if we can’t validate
 
-    return np.array([
-        reward(actual_price, synapse.prediction) if synapse.prediction is not None else 0.0
-        for synapse in responses
-    ])
+#     return np.array([
+#         reward(actual_price, synapse.prediction) if synapse.prediction is not None else 0.0
+#         for synapse in responses
+#     ])
