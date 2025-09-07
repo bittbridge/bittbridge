@@ -52,7 +52,7 @@ async def forward(self):
         deserialize=False
     )
     
-    # Step 5: Store predictions in queue
+    # Step 5: Store predictions in queue (including intervals for Precog methodology)
     now = time.time()
     for i, response in enumerate(responses):
         self.prediction_queue.append({

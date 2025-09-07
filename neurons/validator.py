@@ -30,7 +30,7 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_usdt_cny, reward
+from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_precog_rewards
 
 # Timestamp utilities
 from bittbridge.utils.timestamp import (
@@ -51,25 +51,76 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
         self.prediction_queue = []  # Store pending predictions here
+        
+        # Initialize Precog methodology parameters
+        self.alpha = 0.00958  # EMA smoothing factor from Precog methodology
+        self.previous_weights = {}  # Store previous epoch weights for EMA
 
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         return await forward(self)
-    # Evaluation loop to process predictions after a delay and assign rewards
+    # Evaluation loop to process predictions after a delay and assign rewards using Precog methodology
     async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
-            while True:
-                now = time.time()
-                ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+        while True:
+            now = time.time()
+            ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+            
+            if ready:
+                # Group predictions by timestamp for batch evaluation
+                timestamp_groups = {}
                 for pred in ready:
+                    timestamp = pred["timestamp"]
+                    if timestamp not in timestamp_groups:
+                        timestamp_groups[timestamp] = []
+                    timestamp_groups[timestamp].append(pred)
+                
+                # Process each timestamp group
+                for timestamp, predictions in timestamp_groups.items():
                     actual = get_actual_usdt_cny()
-                    if actual is not None and pred["prediction"] is not None:
-                        reward_val = reward(actual, pred["prediction"])
-                        self.update_scores([reward_val], [pred["miner_uid"]])
-                        bt.logging.info(f"[EVAL] UID={pred['miner_uid']}, Prediction={pred['prediction']}, Actual={actual}, Reward={reward_val}")
+                    if actual is not None:
+                        # Convert predictions to Challenge objects for Precog scoring
+                        responses = []
+                        miner_uids = []
+                        for pred in predictions:
+                            # Create a mock Challenge response
+                            from bittbridge.protocol import Challenge
+                            response = Challenge(timestamp=timestamp)
+                            response.prediction = pred["prediction"]
+                            response.interval = pred.get("interval")
+                            responses.append(response)
+                            miner_uids.append(pred["miner_uid"])
+                        
+                        # Use Precog methodology for scoring
+                        rewards, updated_weights = get_precog_rewards(
+                            actual_price=actual,
+                            responses=responses,
+                            previous_weights=self.previous_weights,
+                            alpha=self.alpha
+                        )
+                        
+                        # Update scores using the new reward system
+                        self.update_scores(rewards, miner_uids)
+                        
+                        # Update previous weights for next epoch
+                        self.previous_weights = updated_weights
+                        
+                        # Log detailed results
+                        for i, pred in enumerate(predictions):
+                            bt.logging.info(
+                                f"[PRECOG_EVAL] UID={pred['miner_uid']}, "
+                                f"Prediction={pred['prediction']}, "
+                                f"Interval={pred.get('interval')}, "
+                                f"Actual={actual}, "
+                                f"Reward={rewards[i]:.4f}"
+                            )
+                
+                # Remove processed predictions
+                for pred in ready:
                     self.prediction_queue.remove(pred)
-                await asyncio.sleep(check_interval)
+            
+            await asyncio.sleep(check_interval)
 
 
 
