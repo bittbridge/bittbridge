@@ -23,6 +23,17 @@ import bittensor as bt
 from .logging import setup_events_logger
 
 
+# Project Constants  
+  
+# Wandb Constants  
+WANDB_PROJECT = "yumaai"  
+  
+# Predictions Constants  
+EVALUATION_WINDOW_HOURS: int = 6  
+PREDICTION_FUTURE_HOURS: int = 1  
+PREDICTION_INTERVAL_MINUTES: int = 5  
+
+
 def is_cuda_available():
     try:
         output = subprocess.check_output(
