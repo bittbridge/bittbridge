@@ -1,33 +1,31 @@
 import os
-
 import bittensor as bt
 import wandb
+from bittbridge import __version__
 
-WANDB_ENTITY = "faeze-safari"
-
+WANDB_ENTITY = "faeze-safari"  # Need to change
 
 def setup_wandb(self) -> None:
     wandb_api_key = os.getenv("WANDB_API_KEY")
     if wandb_api_key is not None:
+        # Optional: wandb.login(key=wandb_api_key)
         wandb.init(
-            project=f"sn{self.config.netuid}-validators",
+            project=f"sn{getattr(getattr(self, 'config', None), 'netuid', 'na')}-validators",
             entity=WANDB_ENTITY,
             config={
-                "hotkey": getattr(self.wallet.hotkey, "ss58_address", None),
+                "hotkey": getattr(getattr(self.wallet, "hotkey", None), "ss58_address", None),
                 "uid": getattr(self, "my_uid", None),
-                "subnet_version": getattr(self, "__class__", type("X",(object,),{})).__name__,
+                "subnet_version": __version__,  # <- version, like Precog
             },
             name=f"validator-{getattr(self, 'my_uid', 'na')}",
             resume="auto",
-            dir=getattr(self.config.neuron, "full_path", None),
+            dir=getattr(getattr(getattr(self, 'config', None), 'neuron', None), 'full_path', None),
             reinit=True,
         )
     else:
         bt.logging.error("WANDB_API_KEY not found in environment variables.")
 
-
 def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
-    """Mirror Precog’s logging dict shape, but keep it robust to missing pieces."""
     try:
         # rewards may be list or numpy array; make it list
         if hasattr(rewards, "tolist"):
@@ -35,11 +33,9 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
 
         miners_info = {}
         for uid, resp, rew in zip(miner_uids, responses, rewards):
-            # Precog expects resp.prediction / resp.interval; fall back if your synapse differs.
             point_pred = getattr(resp, "prediction", None)
-            interval    = getattr(resp, "interval", None)
-
-            miners_info[uid] = {
+            interval   = getattr(resp, "interval", None)
+            miners_info[str(uid)] = {  # cast key to string for nicer W&B tables
                 "miner_hotkey": hotkeys.get(uid),
                 "miner_point_prediction": point_pred,
                 "miner_interval_prediction": interval,
@@ -47,6 +43,19 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
                 "miner_moving_average": float(moving_average_scores.get(uid, 0.0)),
             }
 
-        wandb.log({"miners_info": miners_info})
+        if not miners_info:
+            return
+
+        wandb_val_log = {"miners_info": miners_info}
+
+        # Pre-log trace of the exact payload (fallback to debug if trace is absent)
+        if hasattr(bt.logging, "trace"):
+            bt.logging.trace(f"Attempting to log data to wandb: {wandb_val_log}")
+        else:
+            bt.logging.debug(f"Attempting to log data to wandb: {wandb_val_log}")
+
+        wandb.log(wandb_val_log)
+
     except Exception as e:
-        bt.logging.error(f"Failed to log to wandb: {e}", exc_info=True)
+        bt.logging.error(f"Failed to log to wandb: {str(e)}")
+        bt.logging.error("Full error: ", exc_info=True)
