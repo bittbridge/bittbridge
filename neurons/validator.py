@@ -55,7 +55,7 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        # --- NEW: initialize W&B defensively; never crash if something's missing ---
+        # --- NEW: initialize W&B ---
         try:
             setup_wandb(self)
             self._wandb_ok = True
@@ -83,7 +83,7 @@ class Validator(BaseValidatorNeuron):
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
 
-            # --- NEW: accumulate one batch to log to W&B (Precog logs after reward calc) ---
+            # --- NEW: accumulate one batch to log to W&B ---
             wb_responses = []
             wb_rewards = []
             wb_uids = []
@@ -98,7 +98,7 @@ class Validator(BaseValidatorNeuron):
                         f"Actual={actual}, Reward={reward_val}"
                     )
 
-                    # --- NEW: tiny response shim so log_wandb matches Precog's expected shape ---
+                    # --- NEW ---
                     class _Resp:
                         def __init__(self, prediction):
                             self.prediction = prediction
