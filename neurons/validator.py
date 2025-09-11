@@ -111,7 +111,7 @@ class Validator(BaseValidatorNeuron):
                 # remove from queue whether we could evaluate or not
                 self.prediction_queue.remove(pred)
 
-            # --- NEW: single wandb.log per loop tick, like Precog ---
+            # --- NEW: single wandb.log per loop tick ---
             if getattr(self, "_wandb_ok", False) and wb_uids:
                 try:
                     moving_avgs = getattr(self, "moving_average_scores", {})
