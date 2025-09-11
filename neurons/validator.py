@@ -43,7 +43,7 @@ from bittbridge.utils.timestamp import (
     get_before,
 )
 
-# --- NEW: W&B helper imports (defensive setup + logging) ---
+# --- NEW: W&B helper imports (setup + logging) ---
 from bittbridge.utils.wandb import setup_wandb, log_wandb
 
 
