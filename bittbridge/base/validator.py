@@ -19,12 +19,14 @@
 
 
 import copy
+import json
 import numpy as np
 import asyncio
 import argparse
 import threading
 import bittensor as bt
 import time
+import os
 
 from typing import List, Union
 from traceback import print_exception
@@ -378,15 +380,14 @@ class BaseValidatorNeuron(BaseNeuron):
             hotkeys=self.hotkeys,
         )
         
-        # Save Precog-specific state if it exists
+        # Save incentive mechanism-specific state if it exists
         if hasattr(self, 'previous_weights') and hasattr(self, 'alpha'):
-            import json
-            precog_state = {
+            incentive_mechanism_state = {
                 'previous_weights': self.previous_weights,
                 'alpha': self.alpha
             }
-            with open(self.config.neuron.full_path + "/precog_state.json", 'w') as f:
-                json.dump(precog_state, f)
+            with open(self.config.neuron.full_path + "/incentive_mechanism_state.json", 'w') as f:
+                json.dump(incentive_mechanism_state, f)
 
     def load_state(self):
         """Loads the state of the validator from a file."""
@@ -398,19 +399,17 @@ class BaseValidatorNeuron(BaseNeuron):
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
         
-        # Load Precog-specific state if it exists
-        import os
-        import json
-        precog_state_path = self.config.neuron.full_path + "/precog_state.json"
-        if os.path.exists(precog_state_path):
+        # Load incentive mechanism-specific state if it exists
+        incentive_mechanism_state_path = self.config.neuron.full_path + "/incentive_mechanism_state.json"
+        if os.path.exists(incentive_mechanism_state_path):
             try:
-                with open(precog_state_path, 'r') as f:
-                    precog_state = json.load(f)
-                    self.previous_weights = precog_state.get('previous_weights', {})
-                    self.alpha = precog_state.get('alpha', 0.00958)
-                    bt.logging.info(f"Loaded Precog state: alpha={self.alpha}, weights={len(self.previous_weights)} miners")
+                with open(incentive_mechanism_state_path, 'r') as f:
+                    incentive_mechanism_state = json.load(f)
+                    self.previous_weights = incentive_mechanism_state.get('previous_weights', {})
+                    self.alpha = incentive_mechanism_state.get('alpha', 0.00958)
+                    bt.logging.info(f"Loaded incentive mechanism state: alpha={self.alpha}, weights={len(self.previous_weights)} miners")
             except Exception as e:
-                bt.logging.warning(f"Failed to load Precog state: {e}")
+                bt.logging.warning(f"Failed to load incentive mechanism state: {e}")
                 self.previous_weights = {}
                 self.alpha = 0.00958
         else:

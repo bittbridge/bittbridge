@@ -44,7 +44,8 @@ def get_actual_usdt_cny() -> float:
 
 def calculate_point_forecast_scores(actual_price: float, predictions: List[float]) -> Dict[int, float]:
     """
-    Calculate point forecast scores using Precog methodology.
+    Calculate point forecast scores using incentive mechanism.
+    Only miners with valid predictions receive rewards.
     
     Args:
         actual_price: Ground truth USDT/CNY price
@@ -56,21 +57,33 @@ def calculate_point_forecast_scores(actual_price: float, predictions: List[float
     if actual_price is None or not predictions:
         return {}
     
-    # Calculate relative errors
-    errors = []
-    for pred in predictions:
+    # Filter out miners with no valid predictions
+    valid_predictions = []
+    valid_indices = []
+    
+    for i, pred in enumerate(predictions):
         if pred is not None:
-            rel_error = abs(pred - actual_price) / actual_price
-            errors.append(rel_error)
-        else:
-            errors.append(float('inf'))  # Invalid prediction gets worst rank
+            valid_predictions.append(pred)
+            valid_indices.append(i)
+    
+    # If no valid predictions, return empty dict
+    if not valid_predictions:
+        bt.logging.warning("No valid predictions found - all miners will receive zero reward")
+        return {}
+    
+    # Calculate relative errors for valid predictions only
+    errors = []
+    for pred in valid_predictions:
+        rel_error = abs(pred - actual_price) / actual_price
+        errors.append(rel_error)
     
     # Rank miners by error (lower error = better rank)
-    ranked_indices = sorted(range(len(errors)), key=lambda i: errors[i])
+    ranked_valid_indices = sorted(range(len(errors)), key=lambda i: errors[i])
     
-    # Assign shares using 0.9^rank formula
+    # Assign shares using 0.9^rank formula - only to miners with valid predictions
     shares = {}
-    for rank, miner_idx in enumerate(ranked_indices):
+    for rank, error_idx in enumerate(ranked_valid_indices):
+        miner_idx = valid_indices[error_idx]
         shares[miner_idx] = 0.9 ** rank
     
     bt.logging.info(f"Point forecast scores: {shares}")
@@ -79,7 +92,8 @@ def calculate_point_forecast_scores(actual_price: float, predictions: List[float
 
 def calculate_interval_forecast_scores(actual_price: float, intervals: List[List[float]]) -> Dict[int, float]:
     """
-    Calculate interval forecast scores using Precog methodology.
+    Calculate interval forecast scores using incentive mechanism.
+    Only miners with valid intervals receive rewards.
     
     Args:
         actual_price: Ground truth USDT/CNY price
@@ -91,12 +105,23 @@ def calculate_interval_forecast_scores(actual_price: float, intervals: List[List
     if actual_price is None or not intervals:
         return {}
     
-    scores = []
+    # Filter out miners with no valid intervals
+    valid_intervals = []
+    valid_indices = []
+    
     for i, interval in enumerate(intervals):
-        if interval is None or len(interval) != 2:
-            scores.append(0.0)  # Invalid interval gets worst score
-            continue
-            
+        if interval is not None and len(interval) == 2:
+            valid_intervals.append(interval)
+            valid_indices.append(i)
+    
+    # If no valid intervals, return empty dict
+    if not valid_intervals:
+        bt.logging.warning("No valid intervals found - all miners will receive zero interval reward")
+        return {}
+    
+    # Calculate scores for valid intervals only
+    scores = []
+    for interval in valid_intervals:
         low, high = interval
         
         # Inclusion factor (1 if actual price is within interval, else 0)
@@ -111,11 +136,12 @@ def calculate_interval_forecast_scores(actual_price: float, intervals: List[List
         scores.append(interval_score)
     
     # Rank miners by score (higher score = better rank)
-    ranked_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    ranked_valid_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
     
-    # Assign shares using 0.9^rank formula
+    # Assign shares using 0.9^rank formula - only to miners with valid intervals
     shares = {}
-    for rank, miner_idx in enumerate(ranked_indices):
+    for rank, score_idx in enumerate(ranked_valid_indices):
+        miner_idx = valid_indices[score_idx]
         shares[miner_idx] = 0.9 ** rank
     
     bt.logging.info(f"Interval forecast scores: {shares}")
@@ -124,7 +150,7 @@ def calculate_interval_forecast_scores(actual_price: float, intervals: List[List
 
 def calculate_combined_shares(point_shares: Dict[int, float], interval_shares: Dict[int, float]) -> Dict[int, float]:
     """
-    Combine point and interval shares using Precog methodology.
+    Combine point and interval shares using incentive mechanism.
     
     Args:
         point_shares: Point forecast shares
@@ -152,35 +178,44 @@ def apply_exponential_moving_average(
 ) -> Dict[int, float]:
     """
     Apply exponential moving average to smooth weights over time.
+    Only miners with current submissions get updated weights.
     
     Args:
-        current_shares: Current epoch combined shares
+        current_shares: Current epoch combined shares (only includes miners who submitted)
         previous_weights: Previous epoch weights
-        alpha: EMA smoothing factor (default from Precog methodology)
+        alpha: EMA smoothing factor (default from incentive mechanism)
         
     Returns:
         Dict mapping miner index to final weight
     """
-    all_miners = set(current_shares.keys()) | set(previous_weights.keys())
     final_weights = {}
     
-    for miner_idx in all_miners:
-        current_share = current_shares.get(miner_idx, 0.0)
-        prev_weight = previous_weights.get(miner_idx, 0.5)  # Default to 0.5 for new miners
+    # Only update weights for miners who submitted in current epoch
+    for miner_idx in current_shares.keys():
+        current_share = current_shares[miner_idx]
+        prev_weight = previous_weights.get(miner_idx, 0.0)  # Default to 0.0 for new miners (no free rewards)
         final_weights[miner_idx] = alpha * current_share + (1 - alpha) * prev_weight
+    
+    # Miners who didn't submit in current epoch keep their previous weights (or get 0.0 if new)
+    for miner_idx in previous_weights.keys():
+        if miner_idx not in current_shares:
+            # Miner didn't submit this epoch - they keep previous weight but it decays over time
+            prev_weight = previous_weights[miner_idx]
+            final_weights[miner_idx] = (1 - alpha) * prev_weight  # Decay inactive miners
     
     bt.logging.info(f"Final EMA weights: {final_weights}")
     return final_weights
 
 
-def get_precog_rewards(
+def get_incentive_mechanism_rewards(
     actual_price: float, 
     responses: List[Challenge], 
     previous_weights: Optional[Dict[int, float]] = None,
     alpha: float = 0.00958
 ) -> Tuple[np.ndarray, Dict[int, float]]:
     """
-    Generate rewards using the complete Precog methodology.
+    Generate rewards using the complete incentive mechanism.
+    Only miners with valid submissions receive rewards.
     
     Args:
         actual_price: Ground truth USDT/CNY price
@@ -198,13 +233,13 @@ def get_precog_rewards(
     predictions = [r.prediction for r in responses]
     intervals = [r.interval for r in responses]
     
-    # Calculate point forecast scores
+    # Calculate point forecast scores (only for miners with valid predictions)
     point_shares = calculate_point_forecast_scores(actual_price, predictions)
     
-    # Calculate interval forecast scores
+    # Calculate interval forecast scores (only for miners with valid intervals)
     interval_shares = calculate_interval_forecast_scores(actual_price, intervals)
     
-    # Combine shares
+    # Combine shares (only miners with valid submissions will have shares)
     combined_shares = calculate_combined_shares(point_shares, interval_shares)
     
     # Apply EMA if previous weights are provided
@@ -214,7 +249,12 @@ def get_precog_rewards(
         final_weights = combined_shares
     
     # Convert to numpy array for compatibility
+    # Miners with no valid submissions get 0.0 reward
     rewards = np.array([final_weights.get(i, 0.0) for i in range(len(responses))])
+    
+    # Log reward distribution
+    active_miners = len([r for r in rewards if r > 0])
+    bt.logging.info(f"Reward distribution: {active_miners}/{len(responses)} miners received rewards")
     
     return rewards, final_weights
 
@@ -223,7 +263,7 @@ def get_precog_rewards(
 def reward(actual_price: float, predicted_price: float) -> float:
     """
     Legacy reward function for backward compatibility.
-    Now uses the Precog methodology internally.
+    Now uses the incentive mechanism internally.
     """
     if actual_price is None or predicted_price is None:
         return 0.0

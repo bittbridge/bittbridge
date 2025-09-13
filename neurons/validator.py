@@ -30,7 +30,10 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_precog_rewards
+from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_incentive_mechanism_rewards
+
+# Protocol imports
+from bittbridge.protocol import Challenge
 
 # Timestamp utilities
 from bittbridge.utils.timestamp import (
@@ -52,8 +55,8 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
         self.prediction_queue = []  # Store pending predictions here
         
-        # Initialize Precog methodology parameters
-        self.alpha = 0.00958  # EMA smoothing factor from Precog methodology
+        # Initialize incentive mechanism parameters
+        self.alpha = 0.00958  # EMA smoothing factor from incentive mechanism
         self.previous_weights = {}  # Store previous epoch weights for EMA
 
     async def forward(self):
@@ -61,7 +64,7 @@ class Validator(BaseValidatorNeuron):
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         return await forward(self)
-    # Evaluation loop to process predictions after a delay and assign rewards using Precog methodology
+    # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
     async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
         while True:
             now = time.time()
@@ -80,20 +83,19 @@ class Validator(BaseValidatorNeuron):
                 for timestamp, predictions in timestamp_groups.items():
                     actual = get_actual_usdt_cny()
                     if actual is not None:
-                        # Convert predictions to Challenge objects for Precog scoring
+                        # Convert predictions to Challenge objects for incentive mechanism scoring
                         responses = []
                         miner_uids = []
                         for pred in predictions:
                             # Create a mock Challenge response
-                            from bittbridge.protocol import Challenge
                             response = Challenge(timestamp=timestamp)
                             response.prediction = pred["prediction"]
                             response.interval = pred.get("interval")
                             responses.append(response)
                             miner_uids.append(pred["miner_uid"])
                         
-                        # Use Precog methodology for scoring
-                        rewards, updated_weights = get_precog_rewards(
+                        # Use incentive mechanism for scoring
+                        rewards, updated_weights = get_incentive_mechanism_rewards(
                             actual_price=actual,
                             responses=responses,
                             previous_weights=self.previous_weights,
@@ -109,7 +111,7 @@ class Validator(BaseValidatorNeuron):
                         # Log detailed results
                         for i, pred in enumerate(predictions):
                             bt.logging.info(
-                                f"[PRECOG_EVAL] UID={pred['miner_uid']}, "
+                                f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
                                 f"Interval={pred.get('interval')}, "
                                 f"Actual={actual}, "
