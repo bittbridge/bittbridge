@@ -30,7 +30,10 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_usdt_cny, reward
+from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_incentive_mechanism_rewards
+
+# Protocol imports
+from bittbridge.protocol import Challenge
 
 # Timestamp utilities
 from bittbridge.utils.timestamp import (
@@ -70,48 +73,86 @@ class Validator(BaseValidatorNeuron):
             self.hotkeys = {}
 
         self.prediction_queue = []  # Store pending predictions here
+        
+        # Initialize incentive mechanism parameters
+        self.alpha = 0.00958  # EMA smoothing factor from incentive mechanism
+        self.previous_weights = {}  # Store previous epoch weights for EMA
 
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         return await forward(self)
-
-    # Evaluation loop to process predictions after a delay and assign rewards
+    # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
     async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
-
-            # --- NEW: accumulate one batch to log to W&B ---
+            
+            # Initialize W&B data collection
             wb_responses = []
             wb_rewards = []
             wb_uids = []
-
-            for pred in ready:
-                actual = get_actual_usdt_cny()
-                if actual is not None and pred["prediction"] is not None:
-                    reward_val = reward(actual, pred["prediction"])
-                    self.update_scores([reward_val], [pred["miner_uid"]])
-                    bt.logging.info(
-                        f"[EVAL] UID={pred['miner_uid']}, Prediction={pred['prediction']}, "
-                        f"Actual={actual}, Reward={reward_val}"
-                    )
-
-                    # --- NEW ---
-                    class _Resp:
-                        def __init__(self, prediction):
-                            self.prediction = prediction
-                            self.interval = None  # fill when we support intervals
-
-                    wb_responses.append(_Resp(pred["prediction"]))
-                    wb_rewards.append(reward_val)
-                    wb_uids.append(pred["miner_uid"])
-
-                # remove from queue whether we could evaluate or not
-                self.prediction_queue.remove(pred)
-
-            # --- NEW: single wandb.log per loop tick ---
+            
+            if ready:
+                # Group predictions by timestamp for batch evaluation
+                timestamp_groups = {}
+                for pred in ready:
+                    timestamp = pred["timestamp"]
+                    if timestamp not in timestamp_groups:
+                        timestamp_groups[timestamp] = []
+                    timestamp_groups[timestamp].append(pred)
+                
+                # Process each timestamp group
+                for timestamp, predictions in timestamp_groups.items():
+                    actual = get_actual_usdt_cny()
+                    if actual is not None:
+                        # Convert predictions to Challenge objects for incentive mechanism scoring
+                        responses = []
+                        miner_uids = []
+                        for pred in predictions:
+                            # Create a mock Challenge response
+                            response = Challenge(timestamp=timestamp)
+                            response.prediction = pred["prediction"]
+                            response.interval = pred.get("interval")
+                            responses.append(response)
+                            miner_uids.append(pred["miner_uid"])
+                        
+                        # Use incentive mechanism for scoring
+                        rewards, updated_weights = get_incentive_mechanism_rewards(
+                            actual_price=actual,
+                            responses=responses,
+                            previous_weights=self.previous_weights,
+                            alpha=self.alpha
+                        )
+                        
+                        # Update scores using the new reward system
+                        self.update_scores(rewards, miner_uids)
+                        
+                        # Update previous weights for next epoch
+                        self.previous_weights = updated_weights
+                        
+                        # Collect data for W&B logging
+                        for i, pred in enumerate(predictions):
+                            # Add to W&B data collection
+                            wb_responses.append(responses[i])
+                            wb_rewards.append(rewards[i])
+                            wb_uids.append(pred["miner_uid"])
+                            
+                            # Log detailed results
+                            bt.logging.info(
+                                f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
+                                f"Prediction={pred['prediction']}, "
+                                f"Interval={pred.get('interval')}, "
+                                f"Actual={actual}, "
+                                f"Reward={rewards[i]:.4f}"
+                            )
+                
+                # Remove processed predictions
+                for pred in ready:
+                    self.prediction_queue.remove(pred)
+            
+            # Log to W&B if we have data and W&B is available
             if getattr(self, "_wandb_ok", False) and wb_uids:
                 try:
                     moving_avgs = getattr(self, "moving_average_scores", {})
@@ -126,7 +167,7 @@ class Validator(BaseValidatorNeuron):
                     )
                 except Exception as e:
                     bt.logging.error(f"W&B log failed: {e}")
-
+            
             await asyncio.sleep(check_interval)
 
 

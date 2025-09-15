@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# snporacle
-=======
 <div align="center">
 
 # **Bittensor Subnet Template** <!-- omit in toc -->
@@ -214,4 +211,3 @@ This repository is licensed under the MIT License.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 ```
->>>>>>> 84bc5f173dd7e584ac4f25305797737edd25d76b
