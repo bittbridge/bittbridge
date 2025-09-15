@@ -19,12 +19,14 @@
 
 
 import copy
+import json
 import numpy as np
 import asyncio
 import argparse
 import threading
 import bittensor as bt
 import time
+import os
 
 from typing import List, Union
 from traceback import print_exception
@@ -377,6 +379,15 @@ class BaseValidatorNeuron(BaseNeuron):
             scores=self.scores,
             hotkeys=self.hotkeys,
         )
+        
+        # Save incentive mechanism-specific state if it exists
+        if hasattr(self, 'previous_weights') and hasattr(self, 'alpha'):
+            incentive_mechanism_state = {
+                'previous_weights': self.previous_weights,
+                'alpha': self.alpha
+            }
+            with open(self.config.neuron.full_path + "/incentive_mechanism_state.json", 'w') as f:
+                json.dump(incentive_mechanism_state, f)
 
     def load_state(self):
         """Loads the state of the validator from a file."""
@@ -387,3 +398,20 @@ class BaseValidatorNeuron(BaseNeuron):
         self.step = state["step"]
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
+        
+        # Load incentive mechanism-specific state if it exists
+        incentive_mechanism_state_path = self.config.neuron.full_path + "/incentive_mechanism_state.json"
+        if os.path.exists(incentive_mechanism_state_path):
+            try:
+                with open(incentive_mechanism_state_path, 'r') as f:
+                    incentive_mechanism_state = json.load(f)
+                    self.previous_weights = incentive_mechanism_state.get('previous_weights', {})
+                    self.alpha = incentive_mechanism_state.get('alpha', 0.00958)
+                    bt.logging.info(f"Loaded incentive mechanism state: alpha={self.alpha}, weights={len(self.previous_weights)} miners")
+            except Exception as e:
+                bt.logging.warning(f"Failed to load incentive mechanism state: {e}")
+                self.previous_weights = {}
+                self.alpha = 0.00958
+        else:
+            self.previous_weights = {}
+            self.alpha = 0.00958

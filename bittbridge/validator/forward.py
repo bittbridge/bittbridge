@@ -52,17 +52,27 @@ async def forward(self):
         deserialize=False
     )
     
-    # Step 5: Store predictions in queue
+    # Step 5: Store predictions in queue (including intervals for incentive mechanism)
+    # Only store responses from miners who actually submitted valid predictions
     now = time.time()
+    valid_responses_count = 0
+    
     for i, response in enumerate(responses):
-        self.prediction_queue.append({
-            "timestamp": timestamp,
-            "miner_uid": miner_uids[i],
-            "prediction": response.prediction,
-            "interval": response.interval,
-            "request_time": now
-        })
-        bt.logging.info(f"[COLLECT] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+        # Check if miner provided a valid prediction
+        if response.prediction is not None:
+            self.prediction_queue.append({
+                "timestamp": timestamp,
+                "miner_uid": miner_uids[i],
+                "prediction": response.prediction,
+                "interval": response.interval,
+                "request_time": now
+            })
+            valid_responses_count += 1
+            bt.logging.info(f"[COLLECT] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+        else:
+            bt.logging.warning(f"[NO_SUBMISSION] UID={miner_uids[i]} provided no prediction - will receive zero reward")
+    
+    bt.logging.info(f"[VALIDATOR] Received {valid_responses_count}/{len(responses)} valid predictions")
         
     # bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
     # bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
