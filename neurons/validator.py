@@ -46,6 +46,10 @@ from bittbridge.utils.timestamp import (
     get_before,
 )
 
+# --- NEW: W&B helper imports (setup + logging) ---
+from bittbridge.utils.wandb import setup_wandb, log_wandb
+
+
 class Validator(BaseValidatorNeuron):
 
     def __init__(self, config=None):
@@ -53,6 +57,21 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
+
+        # --- NEW: initialize W&B ---
+        try:
+            setup_wandb(self)
+            self._wandb_ok = True
+        except Exception as e:
+            bt.logging.error(f"W&B setup failed: {e}")
+            self._wandb_ok = False
+
+        # --- NEW: cache hotkeys for W&B logging context ---
+        try:
+            self.hotkeys = {uid: hk for uid, hk in enumerate(self.metagraph.hotkeys)}
+        except Exception:
+            self.hotkeys = {}
+
         self.prediction_queue = []  # Store pending predictions here
         
         # Initialize incentive mechanism parameters
@@ -69,6 +88,11 @@ class Validator(BaseValidatorNeuron):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+            
+            # Initialize W&B data collection
+            wb_responses = []
+            wb_rewards = []
+            wb_uids = []
             
             if ready:
                 # Group predictions by timestamp for batch evaluation
@@ -108,8 +132,14 @@ class Validator(BaseValidatorNeuron):
                         # Update previous weights for next epoch
                         self.previous_weights = updated_weights
                         
-                        # Log detailed results
+                        # Collect data for W&B logging
                         for i, pred in enumerate(predictions):
+                            # Add to W&B data collection
+                            wb_responses.append(responses[i])
+                            wb_rewards.append(rewards[i])
+                            wb_uids.append(pred["miner_uid"])
+                            
+                            # Log detailed results
                             bt.logging.info(
                                 f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
@@ -122,8 +152,23 @@ class Validator(BaseValidatorNeuron):
                 for pred in ready:
                     self.prediction_queue.remove(pred)
             
+            # Log to W&B if we have data and W&B is available
+            if getattr(self, "_wandb_ok", False) and wb_uids:
+                try:
+                    moving_avgs = getattr(self, "moving_average_scores", {})
+                    if not isinstance(moving_avgs, dict):
+                        moving_avgs = {}
+                    log_wandb(
+                        responses=wb_responses,
+                        rewards=wb_rewards,
+                        miner_uids=wb_uids,
+                        hotkeys=getattr(self, "hotkeys", {}),
+                        moving_average_scores=moving_avgs,
+                    )
+                except Exception as e:
+                    bt.logging.error(f"W&B log failed: {e}")
+            
             await asyncio.sleep(check_interval)
-
 
 
 # Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
@@ -131,9 +176,18 @@ class Validator(BaseValidatorNeuron):
 async def metagraph_resync_scheduler(validator, resync_interval=600):
     while True:
         validator.resync_metagraph()
+
+        # --- NEW: refresh cached hotkeys after every resync (for W&B context) ---
+        # This block ensures our hotkeys dict is always in sync with the latest metagraph.
+        try:
+            validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
+        except Exception:
+            pass
+
         bt.logging.info("Metagraph resynced.")
         await asyncio.sleep(resync_interval)
-        
+
+
 async def prediction_scheduler(validator):
     # Set your prediction interval (in minutes)
     prediction_interval = 1  # or get from config
@@ -148,12 +202,14 @@ async def prediction_scheduler(validator):
             timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
         await asyncio.sleep(10)  # Check every 10 seconds
 
+
 async def main():
     validator = Validator()
     eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=15, check_interval=5))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
     resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=10))
-    await asyncio.gather(eval_task , pred_task, resync_task)
+    await asyncio.gather(eval_task, pred_task, resync_task)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
