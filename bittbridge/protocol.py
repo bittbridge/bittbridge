@@ -22,21 +22,6 @@ from typing import List, Optional
 import bittensor as bt
 import pydantic
 
-# These define the protocol for the Bittensor subnet template.
-# ---- miner ----
-# Example usage:
-#   def dummy( synapse: Dummy ) -> Dummy:
-#       synapse.dummy_output = synapse.dummy_input + 1
-#       return synapse
-#   axon = bt.axon().attach( dummy ).serve(netuid=...).start()
-
-# ---- validator ---
-# Example usage:
-#   dendrite = bt.dendrite()
-#   dummy_output = dendrite.query( Dummy( dummy_input = 1 ) )
-#   assert dummy_output == 2
-
-
 class Challenge(bt.Synapse):
     """
     Challenge Synapse: 

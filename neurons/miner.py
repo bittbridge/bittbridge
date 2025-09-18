@@ -19,6 +19,7 @@
 
 import time
 import requests
+import random
 from typing import Tuple
 import typing
 import bittensor as bt
@@ -81,7 +82,7 @@ class Miner(BaseMinerNeuron):
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
         Responds to the Challenge synapse from the validator by submitting:
-        - a USDT/CNY price prediction (currently just the real-time value)
+        - a USDT/CNY price prediction (with added randomness for testing predictions)
         - a naive confidence interval based on fixed volatility assumption
         """
         
@@ -92,7 +93,10 @@ class Miner(BaseMinerNeuron):
         if price is None:
             return synapse  # prediction and interval remain None (validator will ignore)
 
-        # Step 3: Assign point prediction
+        # Step 3: Add random variation (-0.5 to +0.5)
+        price += random.uniform(-0.5, 0.5)
+
+        # Step 4: Assign point prediction
         synapse.prediction = price
 
         # Step 4: Estimate and assign confidence interval

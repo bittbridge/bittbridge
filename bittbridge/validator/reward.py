@@ -17,6 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import os
 import requests
 import numpy as np
 import bittensor as bt
@@ -33,8 +34,13 @@ def get_actual_usdt_cny() -> float:
     Returns:
         float: Current USDT/CNY price or None if fetch fails
     """
+    coingecko_api_key = os.getenv("COINGECKO_API_KEY")
+    if coingecko_api_key is None:
+        bt.logging.error("COINGECKO_API_KEY not found in environment variables.")
+        return None
+    
     try:
-        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key=CG-1UpuR3vjuAqQWJTQo3EPdUmR")
+        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key={coingecko_api_key}")
         response.raise_for_status()
         return response.json()["tether"]["cny"]
     except Exception as e:

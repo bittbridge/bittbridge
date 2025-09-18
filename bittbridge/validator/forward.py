@@ -73,17 +73,3 @@ async def forward(self):
             bt.logging.warning(f"[NO_SUBMISSION] UID={miner_uids[i]} provided no prediction - will receive zero reward")
     
     bt.logging.info(f"[VALIDATOR] Received {valid_responses_count}/{len(responses)} valid predictions")
-        
-    # bt.logging.info(f"[VALIDATOR] Queried miners: {[uid for uid in miner_uids]}")
-    # bt.logging.info(f"[VALIDATOR] Received {len(responses)} responses")
-
-    # # Step 6: Wait before evaluating
-    # bt.logging.info("Waiting 1 minute before evaluating miner predictions...")
-    # await asyncio.sleep(60)
-
-    # # Step 7: Score responses
-    # bt.logging.debug(f"Calculating rewards for timestamp: {pending_evaluation['timestamp']}")
-    # rewards = get_rewards(self, pending_evaluation["timestamp"], pending_evaluation["responses"])
-
-    # # Step 8: Update scores
-    # self.update_scores(rewards, pending_evaluation["miner_uids"])
