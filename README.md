@@ -7,7 +7,7 @@
 
 ## The Incentivized Internet <!-- omit in toc -->
 
-[Discord](https://discord.gg/bittensor) • [Network](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
+[Discord](https://discord.gg/) • [Network](https://taostats.io/)
 </div>
 
 ---
@@ -18,9 +18,13 @@
 # Subnet Deployment Guide (Testnet)
 
 > ⚠️ Always double-check which **network/subnet/wallet** you’re working on during each step
+
 > ⚠️ Make sure that you're using most recent versions of Bittensor SDK & Btcli 
+
 > ⚠️ For a good practice be sure that you're using Virtual env 
+
 > ⚠️ To know your address / wallets -> ```*btcli wallet list*```
+
 > ⚠️ You should have tTAO to register and stake on a testnet
 
 ---
