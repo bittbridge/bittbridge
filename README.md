@@ -1,7 +1,6 @@
 <div align="center">
 
-# **Bittensor Subnet Template** <!-- omit in toc -->
-[![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
+# **Bittbridge** <!-- omit in toc -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 ---
@@ -12,183 +11,218 @@
 </div>
 
 ---
-- [Quickstarter template](#quickstarter-template)
-- [Introduction](#introduction)
-  - [Example](#example)
-- [Installation](#installation)
-  - [Before you proceed](#before-you-proceed)
-  - [Install](#install)
-- [Writing your own incentive mechanism](#writing-your-own-incentive-mechanism)
-- [Writing your own subnet API](#writing-your-own-subnet-api)
-- [Subnet Links](#subnet-links)
+- [Quickstarter guide](#Subnet_Deployment_Guide)
 - [License](#license)
 
 ---
-## Quickstarter template
+# Subnet Deployment Guide (Testnet)
 
-This template contains all the required installation instructions, scripts, and files and functions for:
-- Building Bittensor subnets.
-- Creating custom incentive mechanisms and running these mechanisms on the subnets. 
-
-In order to simplify the building of subnets, this template abstracts away the complexity of the underlying blockchain and other boilerplate code. While the default behavior of the template is sufficient for a simple subnet, you should customize the template in order to meet your specific requirements.
----
-
-## Introduction
-
-**IMPORTANT**: If you are new to Bittensor subnets, read this section before proceeding to [Installation](#installation) section. 
-
-The Bittensor blockchain hosts multiple self-contained incentive mechanisms called **subnets**. Subnets are playing fields in which:
-- Subnet miners who produce value, and
-- Subnet validators who produce consensus
-
-determine together the proper distribution of TAO for the purpose of incentivizing the creation of value, i.e., generating digital commodities, such as intelligence or data. 
-
-Each subnet consists of:
-- Subnet miners and subnet validators.
-- A protocol using which the subnet miners and subnet validators interact with one another. This protocol is part of the incentive mechanism.
-- The Bittensor API using which the subnet miners and subnet validators interact with Bittensor's onchain consensus engine [Yuma Consensus](https://bittensor.com/documentation/validating/yuma-consensus). The Yuma Consensus is designed to drive these actors: subnet validators and subnet miners, into agreement on who is creating value and what that value is worth. 
-
-This starter template is split into three primary files. To write your own incentive mechanism, you should edit these files. These files are:
-1. `template/protocol.py`: Contains the definition of the protocol used by subnet miners and subnet validators.
-2. `neurons/miner.py`: Script that defines the subnet miner's behavior, i.e., how the subnet miner responds to requests from subnet validators.
-3. `neurons/validator.py`: This script defines the subnet validator's behavior, i.e., how the subnet validator requests information from the subnet miners and determines the scores.
-
-### Example
-
-The Bittensor Subnet 1 for Text Prompting is built using this template. See [prompting](https://github.com/macrocosm-os/prompting) for how to configure the files and how to add monitoring and telemetry and support multiple miner types. Also see this Subnet 1 in action on [Taostats](https://taostats.io/subnets/netuid-1/) explorer.
+> ⚠️ Always double-check which **network/subnet/wallet** you’re working on during each step
+> ⚠️ Make sure that you're using most recent versions of Bittensor SDK & Btcli 
+> ⚠️ For a good practice be sure that you're using Virtual env 
+> ⚠️ To know your address / wallets -> ```*btcli wallet list*```
+> ⚠️ You should have tTAO to register and stake on a testnet
 
 ---
+## **Prerequisites**
 
-## Installation
-
-### Before you proceed
-Before you proceed with the installation of the subnet, note the following: 
-
-- Use these instructions to run your subnet locally for your development and testing, or on Bittensor testnet or on Bittensor mainnet. 
-- **IMPORTANT**: We **strongly recommend** that you first run your subnet locally and complete your development and testing before running the subnet on Bittensor testnet. Furthermore, make sure that you next run your subnet on Bittensor testnet before running it on the Bittensor mainnet.
-- You can run your subnet either as a subnet owner, or as a subnet validator or as a subnet miner. 
-- **IMPORTANT:** Make sure you are aware of the minimum compute requirements for your subnet. See the [Minimum compute YAML configuration](./min_compute.yml).
-- Note that installation instructions differ based on your situation: For example, installing for local development and testing will require a few additional steps compared to installing for testnet. Similarly, installation instructions differ for a subnet owner vs a validator or a miner. 
-
-### Install
-
-- **Running locally**: Follow the step-by-step instructions described in this section: [Running Subnet Locally](./docs/running_on_staging.md).
-- **Running on Bittensor testnet**: Follow the step-by-step instructions described in this section: [Running on the Test Network](./docs/running_on_testnet.md).
-- **Running on Bittensor mainnet**: Follow the step-by-step instructions described in this section: [Running on the Main Network](./docs/running_on_mainnet.md).
+ For Windows you should have [**WSL 2** (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/about) 
+ For Windows use Linux Ubuntu to run this guide ☝️
+ Install Docker:
+- Win : https://docs.docker.com/desktop/features/wsl/
+- Mac: https://docs.docker.com/desktop/setup/install/mac-install/
 
 ---
+## Step 1 – Clone Template & Set Up Environment
 
-## Writing your own incentive mechanism
+>Create directory / folder on your machine where you will clone project. 
 
-As described in [Quickstarter template](#quickstarter-template) section above, when you are ready to write your own incentive mechanism, update this template repository by editing the following files. The code in these files contains detailed documentation on how to update the template. Read the documentation in each of the files to understand how to update the template. There are multiple **TODO**s in each of the files identifying sections you should update. These files are:
-- `template/protocol.py`: Contains the definition of the wire-protocol used by miners and validators.
-- `neurons/miner.py`: Script that defines the miner's behavior, i.e., how the miner responds to requests from validators.
-- `neurons/validator.py`: This script defines the validator's behavior, i.e., how the validator requests information from the miners and determines the scores.
-- `template/forward.py`: Contains the definition of the validator's forward pass.
-- `template/reward.py`: Contains the definition of how validators reward miner responses.
+We’ll use our subnet code - main branch [link](https://github.com/bittbridge/bittbridge).  
 
-In addition to the above files, you should also update the following files:
-- `README.md`: This file contains the documentation for your project. Update this file to reflect your project's documentation.
-- `CONTRIBUTING.md`: This file contains the instructions for contributing to your project. Update this file to reflect your project's contribution guidelines.
-- `template/__init__.py`: This file contains the version of your project.
-- `setup.py`: This file contains the metadata about your project. Update this file to reflect your project's metadata.
-- `docs/`: This directory contains the documentation for your project. Update this directory to reflect your project's documentation.
+```bash
 
-__Note__
-The `template` directory should also be renamed to your project name.
+# 2.1 Clone the repo
+
+git clone https://github.com/bittbridge/bittbridge
+
+cd bittbridge
+
+
+# 2.2 Create and activate virtual environment
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+# 2.3 Install dependencies in editable mode
+
+pip install -e .
+
+# Dependencies that should be to run:
+pip install bittensor
+pip install bittensor-cli
+pip install wandb
+pip install pytz
+
+```
+  
+Reference (step №1): 
+
+🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
+
 ---
+## Step 2 – Create Wallets (Validator, Miner)
 
-# Writing your own subnet API
-To leverage the abstract `SubnetsAPI` in Bittensor, you can implement a standardized interface. This interface is used to interact with the Bittensor network and can be used by a client to interact with the subnet through its exposed axons.
+Follow the instructions to create wallets, you need to create 2 wallets a) Miner, b) Validator:
 
-What does Bittensor communication entail? Typically two processes, (1) preparing data for transit (creating and filling `synapse`s) and (2), processing the responses received from the `axon`(s).
+```bash
+btcli w create
+```
 
-This protocol uses a handler registry system to associate bespoke interfaces for subnets by implementing two simple abstract functions:
-- `prepare_synapse`
-- `process_responses`
+> ⚠️ Store mnemonic phrases for coldkey and hotkey, you will end up with 4 mnemonic
 
-These can be implemented as extensions of the generic `SubnetsAPI` interface.  E.g.:
+Reference (step №2): 
+🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
 
+---
+## Step 3 – (Optional) Get faucet tokens
 
-This is abstract, generic, and takes(`*args`, `**kwargs`) for flexibility. See the extremely simple base class:
-```python
-class SubnetsAPI(ABC):
-    def __init__(self, wallet: "bt.wallet"):
-        self.wallet = wallet
-        self.dendrite = bt.dendrite(wallet=wallet)
+If you don't have sufficient faucet tokens, ask the [Bittensor Discord](https://discord.com/channels/799672011265015819/830068283314929684) community for faucet tokens.
+You need to follow specific format of a request, check pinned message. 
 
-    async def __call__(self, *args, **kwargs):
-        return await self.query_api(*args, **kwargs)
+![[Screenshot 2025-09-18 at 12.01.29 PM.png | 150]]
 
-    @abstractmethod
-    def prepare_synapse(self, *args, **kwargs) -> Any:
-        """
-        Prepare the synapse-specific payload.
-        """
-        ...
+If you have any issues or tTAO is urgent, ask Dmitrii to send it to you. 
+## Step 4 – Transfer Tokens to Wallets
 
-    @abstractmethod
-    def process_responses(self, responses: List[Union["bt.Synapse", Any]]) -> Any:
-        """
-        Process the responses from the network.
-        """
-        ...
+Check wallet which should have tTAO balance.
+
+```bash
+btcli w balance --network test
+# Wallet name with balance
+```
+
+![[Screenshot 2025-09-16 at 5.25.27 PM.png]]
+
+Transfer tTAO from a wallet with a balance small amount to miner & validator wallets (to the wallets you just created):
+
+```bash
+
+btcli wallet transfer \
+--amount 1 \
+--wallet.name MAIN_WALLET \
+--destination MINER/VALIDATOR_WALLET_COLDKEY_ADDRESS \
+--network test
 
 ```
 
+---
+## Step 5 – Check if subnet is running on a blockchain
 
-Here is a toy example:
+Verify with:
 
-```python
-from bittensor.subnets import SubnetsAPI
-from MySubnet import MySynapse
+```bash
 
-class MySynapseAPI(SubnetsAPI):
-    def __init__(self, wallet: "bt.wallet"):
-        super().__init__(wallet)
-        self.netuid = 99
+btcli subnet show --network test --netuid 420
 
-    def prepare_synapse(self, prompt: str) -> MySynapse:
-        # Do any preparatory work to fill the synapse
-        data = do_prompt_injection(prompt)
-
-        # Fill the synapse for transit
-        synapse = StoreUser(
-            messages=[data],
-        )
-        # Send it along
-        return synapse
-
-    def process_responses(self, responses: List[Union["bt.Synapse", Any]]) -> str:
-        # Look through the responses for information required by your application
-        for response in responses:
-            if response.dendrite.status_code != 200:
-                continue
-            # potentially apply post processing
-            result_data = postprocess_data_from_response(response)
-        # return data to the client
-        return result_data
 ```
 
-You can use a subnet API to the registry by doing the following:
-1. Download and install the specific repo you want
-1. Import the appropriate API handler from bespoke subnets
-1. Make the query given the subnet specific API
+---
+## Step 6 – Register Validator & Miner Hotkeys
 
+```bash
 
+btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
 
-# Subnet Links
-In order to see real-world examples of subnets in-action, see the `subnet_links.py` document or access them from inside the `template` package by:
-```python
-import template
-template.SUBNET_LINKS
-[{'name': 'sn0', 'url': ''},
- {'name': 'sn1', 'url': 'https://github.com/opentensor/prompting/'},
- {'name': 'sn2', 'url': 'https://github.com/bittranslateio/bittranslate/'},
- {'name': 'sn3', 'url': 'https://github.com/gitphantomman/scraping_subnet/'},
- {'name': 'sn4', 'url': 'https://github.com/manifold-inc/targon/'},
-...
-]
+btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
+
+```
+
+Optional checks:
+
+```bash
+
+btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --subtensor.network test
+
+btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network test
+
+```
+
+---
+## Step 7 – Collect your API at CoinGecko evaluate miner's work
+
+#### Obtain & Setup CoinGecko API Key (Validators Only)
+
+Before starting the process, validators would be required to procure a CoinGecko API Key. Please follow the instructions mentioned below:  
+
+- Log in to [CoinGecko](https://www.coingecko.com/en/developers/dashboard) and generate an API key in your account settings.
+## Step 8 – Collect your API at WandB to store validator's work
+
+#### Obtain & Setup WandB API Key (Validators Only)
+
+Before starting the process, validators would be required to procure a WANDB API Key. Please follow the instructions mentioned below:  
+
+- Log in to [Weights & Biases](https://wandb.ai/) and generate an API key in your account settings.
+
+For help finding your wandb api key, look [here](https://docs.wandb.ai/support/find_api_key/)
+
+---
+## Step 9 – Run Miner & Validator
+
+Run these **from the `bittbridge` directory with activated venv**:
+
+> ⚠️ !!! **Run in 2 different terminals:** !!!
+
+**Terminal A – Validator**
+```bash
+
+# Validator
+# In the terminal where you will start validator paste these commands:
+# Set the variable `COINGECKO_API_KEY` in your environment:
+`export COINGECKO_API_KEY="YOUR_COINGECKO_API_KEY_HERE"`
+# Set the variable `WANDB_API_KEY` in your environment:
+`export WANDB_API_KEY="YOUR_API_KEY"`
+# Run validator 
+python3 -m neurons.validator \
+  --netuid 420 \
+  --subtensor.network test \
+  --wallet.name YOUR_VALIDATOR_NAME \
+  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
+  --logging.debug
+```
+
+**Terminal B – Miner**
+```bash
+# Miner
+
+python3 -m neurons.miner \
+  --netuid 420 \
+  --subtensor.network test \
+  --wallet.name YOUR_MINER_NAME \
+  --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
+  --logging.debug
+```
+
+---
+
+## Final Checklist
+
+| ✅   | Task                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------ |
+|     | new directory created                                                                                        |
+|     | venv created & activated                                                                                     |
+|     | Repo cloned (`bittbridge/`) and dependencies installed                                                       |
+|     | Two wallets created: miner & validator (each has cold+hot); mnemonics stored; `btcli wallet list` shows them |
+|     | Have tTAO on testnet (via Discord faucet or Dmitrii)                                                         |
+|     | Sent small tTAO to both coldkeys (`btcli wallet transfer --dest ...`)                                        |
+|     | Registered miner hotkey to subnet `netuid 420`                                                               |
+|     | Registered validator hotkey to subnet `netuid 420`                                                           |
+|     | Validator: CoinGecko API key + W&B API key set;                                                              |
+|     | Two terminals open: validator terminal has env vars (CoinGecko & WandB) exported                             |
+|     | Validator launched with                                                                                      |
+|     | Miner launched with                                                                                          |
+|     | Logs show metagraph sync and request/response traffic                                                        |
+
 ```
 
 ## License
