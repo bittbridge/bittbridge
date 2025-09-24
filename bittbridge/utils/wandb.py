@@ -33,7 +33,7 @@ def setup_wandb(self) -> None:
 
     # Init W&B
     wandb.init(
-        project=os.getenv("WANDB_PROJECT", f"sn{netuid}-validators"),
+        project=f"sn{self.config.netuid}-validators",
         entity=WANDB_ENTITY,
         config={
             "hotkey": hotkey,
@@ -43,7 +43,7 @@ def setup_wandb(self) -> None:
         name=run_name,
         resume="auto",
         dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
-        reinit=True,
+        reinit='default',
     )
 
 def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
