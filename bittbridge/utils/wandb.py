@@ -7,23 +7,44 @@ WANDB_ENTITY = "bittbridge_uconn"
 
 def setup_wandb(self) -> None:
     wandb_api_key = os.getenv("WANDB_API_KEY")
-    if wandb_api_key is not None:
-        # Optional: wandb.login(key=wandb_api_key)
-        wandb.init(
-            project=f"sn{getattr(getattr(self, 'config', None), 'netuid', 'na')}-validators",
-            entity=WANDB_ENTITY,
-            config={
-                "hotkey": getattr(getattr(self.wallet, "hotkey", None), "ss58_address", None),
-                "uid": getattr(self, "my_uid", None),
-                "subnet_version": __version__,  # <- version, like Precog
-            },
-            name=f"validator-{getattr(self, 'my_uid', 'na')}",
-            resume="auto",
-            dir=getattr(getattr(getattr(self, 'config', None), 'neuron', None), 'full_path', None),
-            reinit=True,
-        )
-    else:
+    if wandb_api_key is None:
         bt.logging.error("WANDB_API_KEY not found in environment variables.")
+        return
+
+    # Gather fields safely
+    netuid = getattr(getattr(self, "config", None), "netuid", "na")
+    hotkey = getattr(getattr(self.wallet, "hotkey", None), "ss58_address", None)
+
+    # Prefer self.my_uid; if missing, try to infer from metagraph by hotkey match
+    uid = getattr(self, "my_uid", None)
+    if uid is None and hotkey is not None:
+        try:
+            uid = self.metagraph.hotkeys.index(hotkey)
+        except Exception:
+            uid = None  # keep None if not found
+
+    # Build a stable, human-friendly name:
+    #   - validator-<uid>-<version> when we know uid
+    #   - otherwise validator-<last6_of_hotkey>-<version>
+    from bittbridge import __version__
+    fallback = (hotkey[-6:] if isinstance(hotkey, str) and len(hotkey) >= 6 else "na")
+    name_uid = uid if uid is not None else fallback
+    run_name = f"validator-{name_uid}-{__version__}"
+
+    # Init W&B
+    wandb.init(
+        project=f"sn{self.config.netuid}-validators",
+        entity=WANDB_ENTITY,
+        config={
+            "hotkey": hotkey,
+            "uid": uid,
+            "subnet_version": __version__,
+        },
+        name=run_name,
+        resume="auto",
+        dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
+        reinit='default',
+    )
 
 def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
     try:
