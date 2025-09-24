@@ -32,9 +32,6 @@
 
  For Windows you should have [**WSL 2** (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/about) 
  For Windows use Linux Ubuntu to run this guide ☝️
- Install Docker:
-- Win : https://docs.docker.com/desktop/features/wsl/
-- Mac: https://docs.docker.com/desktop/setup/install/mac-install/
 
 ---
 ## Step 1 – Clone Template & Set Up Environment
