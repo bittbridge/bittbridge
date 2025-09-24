@@ -36,7 +36,7 @@
 ---
 ## Step 1 – Clone Template & Set Up Environment
 
->Create directory / folder on your machine where you will clone project. 
+> ⚠️ Create directory / folder on your machine where you will clone project. 
 
 We’ll use our subnet code - main branch [link](https://github.com/bittbridge/bittbridge).  
 
@@ -74,7 +74,9 @@ Reference (step №1):
 ---
 ## Step 2 – Create Wallets (Validator, Miner)
 
-Follow the instructions to create wallets, you need to create 2 wallets a) Miner, b) Validator:
+Follow the instructions to create wallets, you need to create 2 wallets:
+a) One for - Miner
+b) Second for - Validator
 
 ```bash
 btcli w create
