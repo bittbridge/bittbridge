@@ -82,7 +82,7 @@ b) Second for - Validator
 btcli w create
 ```
 
-> ⚠️ Store mnemonic phrases for coldkey and hotkey, you will end up with 4 mnemonic
+> ⚠️ Store mnemonic phrases for coldkey and hotkey, you will end up with **4** mnemonic
 
 Reference (step №2): 
 🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
@@ -90,12 +90,19 @@ Reference (step №2):
 ---
 ## Step 3 – (Optional) Get faucet tokens
 
-If you don't have sufficient faucet tokens, ask the [Bittensor Discord](https://discord.com/channels/799672011265015819/830068283314929684) community for faucet tokens.
-You need to follow specific format of a request, check pinned message. 
+If you don't have sufficient faucet (tTAO) tokens, ask the [Bittensor Discord](https://discord.com/channels/799672011265015819/830068283314929684) community for faucet tokens.
+Workflow to get tokends:
+1) Go to Bittensor discord channel
+2) Go to help forum channel -> Requests for Testnet TAO
+3) Leave request according to a special format mentioned in pinned message in this channel.
+4) After some time you will receive on wallet your requested for tTAO, you can check balance with:
+```bash
+btcli w balance --network test
+# Wallet name with balance
+```
 
-![[Screenshot 2025-09-18 at 12.01.29 PM.png | 150]]
+> ⚠️ If you have any issues or you're waiting tTAO more than 1 day -> ask Dmitrii to send it to you.
 
-If you have any issues or tTAO is urgent, ask Dmitrii to send it to you. 
 ## Step 4 – Transfer Tokens to Wallets
 
 Check wallet which should have tTAO balance.
@@ -105,16 +112,21 @@ btcli w balance --network test
 # Wallet name with balance
 ```
 
-![[Screenshot 2025-09-16 at 5.25.27 PM.png]]
-
-Transfer tTAO from a wallet with a balance small amount to miner & validator wallets (to the wallets you just created):
+Transfer tTAO from a wallet with a balance small amount to Miner & Validator wallets (to the wallets you just created), follow these commands:
 
 ```bash
-
+# For miner:
 btcli wallet transfer \
 --amount 1 \
---wallet.name MAIN_WALLET \
---destination MINER/VALIDATOR_WALLET_COLDKEY_ADDRESS \
+--wallet.name WALLET_NAME_WITH_tTAO \
+--destination MINER_WALLET_COLDKEY_ADDRESS \
+--network test
+
+# For validator:
+btcli wallet transfer \
+--amount 1 \
+--wallet.name WALLET_NAME_WITH_tTAO \
+--destination VALIDATOR_WALLET_COLDKEY_ADDRESS \
 --network test
 
 ```
@@ -152,13 +164,15 @@ btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network t
 ```
 
 ---
-## Step 7 – Collect your API at CoinGecko evaluate miner's work
+## Step 7 – Collect your API key at CoinGecko so Validator can evaluate Miner's work 
 
 #### Obtain & Setup CoinGecko API Key (Validators Only)
 
 Before starting the process, validators would be required to procure a CoinGecko API Key. Please follow the instructions mentioned below:  
 
 - Log in to [CoinGecko](https://www.coingecko.com/en/developers/dashboard) and generate an API key in your account settings.
+- Save it somewhere for next step
+
 ## Step 8 – Collect your API at WandB to store validator's work
 
 #### Obtain & Setup WandB API Key (Validators Only)
@@ -166,13 +180,14 @@ Before starting the process, validators would be required to procure a CoinGecko
 Before starting the process, validators would be required to procure a WANDB API Key. Please follow the instructions mentioned below:  
 
 - Log in to [Weights & Biases](https://wandb.ai/) and generate an API key in your account settings.
+- Save it somewhere for next step
 
 For help finding your wandb api key, look [here](https://docs.wandb.ai/support/find_api_key/)
 
 ---
 ## Step 9 – Run Miner & Validator
 
-Run these **from the `bittbridge` directory with activated venv**:
+Run these commands **from the `bittbridge` directory with activated venv**:
 
 > ⚠️ !!! **Run in 2 different terminals:** !!!
 
@@ -181,10 +196,13 @@ Run these **from the `bittbridge` directory with activated venv**:
 
 # Validator
 # In the terminal where you will start validator paste these commands:
+
 # Set the variable `COINGECKO_API_KEY` in your environment:
-`export COINGECKO_API_KEY="YOUR_COINGECKO_API_KEY_HERE"`
+`export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"`
+
 # Set the variable `WANDB_API_KEY` in your environment:
-`export WANDB_API_KEY="YOUR_API_KEY"`
+`export WANDB_API_KEY="PASTE_YOUR_API_KEY"`
+
 # Run validator 
 python3 -m neurons.validator \
   --netuid 420 \
@@ -197,6 +215,8 @@ python3 -m neurons.validator \
 **Terminal B – Miner**
 ```bash
 # Miner
+# Set the variable `COINGECKO_API_KEY` in your environment for testing purposes:
+`export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"`
 
 python3 -m neurons.miner \
   --netuid 420 \
