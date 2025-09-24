@@ -23,9 +23,6 @@ import time
 # Bittensor
 import bittensor as bt
 
-# WandB
-import wandb
-
 # import base validator class which takes care of most of the boilerplate
 from bittbridge.base.validator import BaseValidatorNeuron
 
@@ -81,17 +78,6 @@ class Validator(BaseValidatorNeuron):
         self.alpha = 0.00958  # EMA smoothing factor from incentive mechanism
         self.previous_weights = {}  # Store previous epoch weights for EMA
 
-    def _rename_wandb(self):
-        """Rename the W&B run to include the real UID once it's available."""
-        try:
-            if getattr(self, "_wandb_ok", False) and getattr(self, "my_uid", None) is not None and wandb.run is not None:
-                new_name = f"validator-{self.my_uid}"
-                if wandb.run.name != new_name:
-                    wandb.run.name = new_name
-                    wandb.run.save()  # push the change to the UI
-        except Exception as e:
-            bt.logging.debug(f"Couldn't rename W&B run: {e}")
-            
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
@@ -100,7 +86,6 @@ class Validator(BaseValidatorNeuron):
     # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
     async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
         while True:
-            self._rename_wandb()
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
             
