@@ -34,7 +34,7 @@ def setup_wandb(self) -> None:
     # Init W&B
     wandb.init(
         project=os.getenv("WANDB_PROJECT", f"sn{netuid}-validators"),
-        entity=WANDB_ENTITY
+        entity=WANDB_ENTITY,
         config={
             "hotkey": hotkey,
             "uid": uid,
