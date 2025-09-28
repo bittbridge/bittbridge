@@ -198,10 +198,10 @@ Run these commands **from the `bittbridge` directory with activated venv**:
 # In the terminal where you will start validator paste these commands:
 
 # Set the variable `COINGECKO_API_KEY` in your environment:
-`export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"`
+export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
 
 # Set the variable `WANDB_API_KEY` in your environment:
-`export WANDB_API_KEY="PASTE_YOUR_API_KEY"`
+export WANDB_API_KEY="PASTE_YOUR_API_KEY"
 
 # Run validator 
 python3 -m neurons.validator \
@@ -216,7 +216,7 @@ python3 -m neurons.validator \
 ```bash
 # Miner
 # Set the variable `COINGECKO_API_KEY` in your environment for testing purposes:
-`export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"`
+export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
 
 python3 -m neurons.miner \
   --netuid 420 \
