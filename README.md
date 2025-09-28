@@ -190,6 +190,7 @@ For help finding your wandb api key, look [here](https://docs.wandb.ai/support/
 Run these commands **from the `bittbridge` directory with activated venv**:
 
 > ⚠️ !!! **Run in 2 different terminals:** !!!
+> ⚠️ !!! **Be sure that venv is activated in both terminals ** !!!
 
 **Terminal A – Validator**
 ```bash
