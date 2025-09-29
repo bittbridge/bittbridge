@@ -44,12 +44,13 @@ from bittbridge.base.miner import BaseMinerNeuron
 
 # Fetch the current price of USDT in CNY using CoinGecko's public API.
 
-coingecko_api_key = os.getenv("COINGECKO_API_KEY")
+
+def fetch_current_usdt_cny() -> float:
+    coingecko_api_key = os.getenv("COINGECKO_API_KEY")
     if coingecko_api_key is None:
         bt.logging.error("COINGECKO_API_KEY not found in environment variables.")
         return None
-
-def fetch_current_usdt_cny() -> float:
+        
     try:
         response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key={coingecko_api_key}")
         response.raise_for_status()  # Raise exception for HTTP errors (4xx/5xx)
