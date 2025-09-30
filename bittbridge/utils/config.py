@@ -169,6 +169,28 @@ def add_miner_args(cls, parser):
         help="Wandb entity to log to.",
     )
 
+    parser.add_argument(
+    "--neuron.type",
+    type=str,
+    help="Specifies the type of neuron (e.g., MinerNeuron, ValidatorNeuron, CustomNeuron).",
+    default="MinerNeuron",
+    
+    )
+    
+    parser.add_argument(
+    "--neuron.thread_join_timeout",
+    type=float,
+    help="Timeout in seconds for joining the miner thread when stopping it.",
+    default=5.0,
+
+    )
+
+    parser.add_argument(
+    "--neuron.sleep_interval",
+    type=float,
+    help="Number of seconds the miner waits between checking block updates.",
+    default=1.0,
+    )
 
 def add_validator_args(cls, parser):
     """Add validator specific arguments to the parser."""
