@@ -127,7 +127,7 @@ class Validator(BaseValidatorNeuron):
                         )
                         
                         
-                        # Map index-keyed weights (aligned with responses) to real UIDs for W&B
+                        # Map index-keyed weights, which are aligned with responses, to real UIDs for W&B
                         if isinstance(updated_weights, dict):
                              self.moving_average_scores = {
                                   int(miner_uids[int(i)]): float(v)
