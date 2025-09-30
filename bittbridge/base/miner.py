@@ -34,7 +34,9 @@ class BaseMinerNeuron(BaseNeuron):
     Base class for Bittensor miners.
     """
 
-    neuron_type: str = "MinerNeuron"
+    @property
+    def neuron_type(self) -> str:
+        return self.config.neuron.type
 
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser):
@@ -120,7 +122,7 @@ class BaseMinerNeuron(BaseNeuron):
                     < self.config.neuron.epoch_length
                 ):
                     # Wait before checking again.
-                    time.sleep(1)
+                    time.sleep(self.config.neuron.sleep_interval)
 
                     # Check if we should exit.
                     if self.should_exit:
@@ -161,7 +163,7 @@ class BaseMinerNeuron(BaseNeuron):
             bt.logging.debug("Stopping miner in background thread.")
             self.should_exit = True
             if self.thread is not None:
-                self.thread.join(5)
+                self.thread.join(self.config.neuron.thread_join_timeout)
             self.is_running = False
             bt.logging.debug("Stopped")
 
