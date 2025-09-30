@@ -3,7 +3,7 @@ import bittensor as bt
 import wandb
 from bittbridge import __version__
 
-WANDB_ENTITY = "bittbridge_uconn" 
+WANDB_ENTITY = "bittbridge_uconn"
 
 def setup_wandb(self) -> None:
     wandb_api_key = os.getenv("WANDB_API_KEY")
@@ -43,7 +43,7 @@ def setup_wandb(self) -> None:
         name=run_name,
         resume="auto",
         dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
-        reinit='default',
+        reinit="default",
     )
 
 def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
@@ -51,6 +51,17 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
         # rewards may be list or numpy array; make it list
         if hasattr(rewards, "tolist"):
             rewards = rewards.tolist()
+
+        def _ma_lookup(ma_scores, uid):
+            # supports dict {uid->val} or list/tuple indexed by uid
+            try:
+                if isinstance(ma_scores, dict):
+                    return float(ma_scores[uid]) if uid in ma_scores else float('nan')
+                if isinstance(ma_scores, (list, tuple)):
+                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float('nan')
+            except Exception:
+                pass
+            return float('nan')
 
         miners_info = {}
         for uid, resp, rew in zip(miner_uids, responses, rewards):
@@ -61,7 +72,7 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
                 "miner_point_prediction": point_pred,
                 "miner_interval_prediction": interval,
                 "miner_reward": float(rew) if rew is not None else None,
-                "miner_moving_average": float(moving_average_scores.get(uid, 0.0)),
+                "miner_moving_average": _ma_lookup(moving_average_scores, uid),
             }
 
         if not miners_info:
