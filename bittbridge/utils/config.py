@@ -180,6 +180,33 @@ def add_validator_args(cls, parser):
         default="validator",
     )
 
+    # First Change: Timeout
+
+    parser.add_argument(
+    "--neuron.sleep_interval",
+    type=int,
+    help="Number of seconds to sleep between validator loops.",
+    default=int(os.getenv("VALIDATOR_SLEEP_INTERVAL", 20)),
+    )
+
+# Second Change: Incentive Alpha
+
+    parser.add_argument(
+    "--neuron.incentive_alpha",
+    type=float,
+    help="Default alpha for incentive mechanism (used if missing in saved state).",
+    default=float(os.getenv("VALIDATOR_INCENTIVE_ALPHA", 0.00958)),
+    )
+
+# Third Change: Join Timeout
+
+    parser.add_argument(
+    "--neuron.thread_join_timeout",
+    type=float,
+    help="Seconds to wait when joining background validator thread.",
+    default=float(os.getenv("VALIDATOR_THREAD_JOIN_TIMEOUT", 5)),
+    )
+
     parser.add_argument(
         "--neuron.timeout",
         type=float,
