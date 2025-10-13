@@ -160,7 +160,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.sync()
 
                 self.step += 1
-                time.sleep(20)
+                time.sleep(self.config.neuron.sleep_interval)
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
@@ -219,7 +219,7 @@ class BaseValidatorNeuron(BaseNeuron):
         if self.is_running:
             bt.logging.debug("Stopping validator in background thread.")
             self.should_exit = True
-            self.thread.join(5)
+            self.thread.join(self.config.neuron.thread_join_timeout) 
             self.is_running = False
             bt.logging.debug("Stopped")
 
@@ -414,4 +414,4 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.alpha = 0.00958
         else:
             self.previous_weights = {}
-            self.alpha = 0.00958
+            self.alpha = getattr(self.config.neuron, "incentive_alpha", 0.00958)
