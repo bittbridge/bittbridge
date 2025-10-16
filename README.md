@@ -108,7 +108,7 @@ Follow the setup guide here: [Validator Setup](docs/running_validator_guide.md)
 
 ---
 
-## 🧭 Roadmap  
+## 📅 Roadmap  
 
 | Phase | Milestone | Status |
 |-------|------------|--------|
