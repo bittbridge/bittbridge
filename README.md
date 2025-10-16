@@ -30,6 +30,14 @@
 
 ---
 
+<div align="center">
+
+| **Testnet UID:**  420 <br> **Mainnet UID:**  XX |
+| - |
+
+</div>
+
+
 ## 💱 Introduction  
 
 The FXspresso Subnet utilizes Bittensor’s decentralized intelligence framework to generate probabilistic, data-driven forecasts of the USD/CNY exchange rate through a network of competing and cooperating models.
@@ -93,16 +101,25 @@ Our scoring design ensures that miners are rewarded for **accuracy**, **confiden
 ## 🚀 Getting Started  
 
 ### Run a Miner  
-Follow the step-by-step guide here: [Miner Setup](docs/running_miner_guide.md)
+Want to earn tao by mining? Follow the step-by-step guide here: [Miner Setup](docs/running_miner_guide.md)
 
 ### Run a Validator  
-Follow the setup guide here: [Validator Setup](docs/running_validator_guide.md)
+Interested in running a validator? Follow the step-by-step guide here: [Validator Setup](docs/running_validator_guide.md)
 
 ---
 
-## 🔒 Integrity  
+## 📈 Data & Ground Truth
 
-- **Hash Verification:** All model files and predictions are hashed (SHA-256).  
+- **Pair:** USD/CNY 
+- **Frequency:** Hourly snapshots
+- **Source:** Exchange rate data is fetched from the [CoinGecko API](https://www.coingecko.com/en/api).
+
+---
+
+## 🔒 Security & Integrity  
+
+- **Hash Verification:** All model files and predictions are hashed (SHA-256).
+- **Privacy Protection:** FXspresso does not use, collect any user data, PII, or anything related to the end user which would otherwise be considered invasive or intrusive.
 - **Cutoff Enforcement:** Predictions must be submitted before each round’s deadline.  
 - **Reputation Decay:** Inactive miners gradually lose weight (EMA decay).  
 
@@ -116,6 +133,16 @@ Follow the setup guide here: [Validator Setup](docs/running_validator_guide.md)
 | Q1 2026 | Public leaderboard and analytics dashboard | 🔜 |
 | Q2 2026 | Expand to multiple currency pairs | 🔜 |
 | Q3 2026 | Introduce backtesting-based scoring | 🔜 |
+
+---
+
+---
+
+## ⚠️ Disclaimer  
+
+This subnet is developed for research and educational use.
+
+Forecasts and outputs are provided for informational purposes only and do not constitute financial advice or investment recommendations.
 
 ---
 
@@ -140,5 +167,4 @@ This repository is licensed under the MIT License:
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
 ```
