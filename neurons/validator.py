@@ -1,7 +1,4 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
-# Copyright © 2023 <your name>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -58,7 +55,7 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        # --- NEW: initialize W&B ---
+        # initialize W&B
         try:
             setup_wandb(self)
             self._wandb_ok = True
@@ -66,7 +63,7 @@ class Validator(BaseValidatorNeuron):
             bt.logging.error(f"W&B setup failed: {e}")
             self._wandb_ok = False
 
-        # --- NEW: cache hotkeys for W&B logging context ---
+        # cache hotkeys for W&B logging context
         try:
             self.hotkeys = {uid: hk for uid, hk in enumerate(self.metagraph.hotkeys)}
         except Exception:
@@ -84,7 +81,8 @@ class Validator(BaseValidatorNeuron):
         """
         return await forward(self)
     # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
-    async def evaluation_loop(self, evaluation_delay=15, check_interval=5):
+    # evaluation_delay: the delay in seconds after which the predictions are processed
+    async def evaluation_loop(self, evaluation_delay=3600, check_interval=10):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
@@ -177,7 +175,7 @@ async def metagraph_resync_scheduler(validator, resync_interval=600):
     while True:
         validator.resync_metagraph()
 
-        # --- NEW: refresh cached hotkeys after every resync (for W&B context) ---
+        # refresh cached hotkeys after every resync (for W&B context)
         # This block ensures our hotkeys dict is always in sync with the latest metagraph.
         try:
             validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
@@ -190,7 +188,7 @@ async def metagraph_resync_scheduler(validator, resync_interval=600):
 
 async def prediction_scheduler(validator):
     # Set your prediction interval (in minutes)
-    prediction_interval = 1  # or get from config
+    prediction_interval = 5  # Query miners every 5 minutes
     # Initialize timestamp to current time, rounded to interval
     timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
     while True:
@@ -205,9 +203,9 @@ async def prediction_scheduler(validator):
 
 async def main():
     validator = Validator()
-    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=15, check_interval=5))
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=3600, check_interval=10))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
-    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=10))
+    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=600))
     await asyncio.gather(eval_task, pred_task, resync_task)
 
 

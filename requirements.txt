@@ -7,5 +7,6 @@ numpy>=1
 setuptools>=68
 requests>=2.31
 bittensor>=7.0.0
+bittensor-cli>=7.0.0
 wandb>=0.18
 pytz>=2025.2
