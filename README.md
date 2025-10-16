@@ -1,375 +1,129 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/bittbridge/bittbridge/FS-Drafting-ReadMe/docs/logo_FXspresso.svg" width="150"/>
+</p>
+
+<h1 align="center">FXspresso Subnet</h1>
+
 <div align="center">
 
-# **Bittbridge** <!-- omit in toc -->
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bittbridge/bittbridge)
+ [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bittbridge/bittbridge)
 
----
-
-## The Incentivized Internet <!-- omit in toc -->
-
-[Discord](https://discord.gg/) • [Network](https://taostats.io/)
 </div>
 
----
-- [Quickstarter guide](#Subnet_Deployment_Guide)
-- [License](#license)
+<p align="center">
+  <b>A decentralized Bittensor subnet for USD/CNY exchange rate forecasting</b><br>
+  Developed by the 
+  <a href="https://www.linkedin.com/posts/bittbridge-uconn_meet-the-bittbridge-team-behind-every-activity-7374484770837188608-UzTE">
+    BittBridge Team
+  </a> at the University of Connecticut (UConn)<br>
+  In collaboration with Yuma, a DCG Company
+</p>
+
+
+<p align="center">
+  <a href="https://bittensor.com">Bittensor</a> · 
+  <a href="https://discord.gg">Discord</a> · 
+  <a href="https://taostats.io/">Network</a>
+</p>
+
+
 
 ---
-# Subnet Deployment Guide (Testnet)
 
-> ⚠️ Always double-check which **network/subnet/wallet** you’re working on during each step
+## 💱 Introduction  
 
-> ⚠️ Make sure that you're using most recent versions of Bittensor SDK & Btcli 
+The FXspresso Subnet utilizes Bittensor’s decentralized intelligence framework to generate probabilistic, data-driven forecasts of the USD/CNY exchange rate through a network of competing and cooperating models.
 
-> ⚠️ For a good practice be sure that you're using Virtual env 
+Participants compete and collaborate to produce accurate and well-calibrated forecasts, while validators ensure transparent and fair evaluation.
 
-> ⚠️ To know your address / wallets -> ```*btcli wallet list*```
-
-> ⚠️ You should have tTAO to register and stake on a testnet
-
-> 🚨 **CRITICAL**: Miner & Validator must be accessible from the internet - be sure it's port forwarding configured on your router! (see troubleshooting section)
-
----
-## **Prerequisites**
-
- For Windows you should have [**WSL 2** (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/about) 
- For Windows use Linux Ubuntu to run this guide ☝️
-
----
-## Step 1 – Clone Template & Set Up Environment
-
-> ⚠️ Create directory / folder on your machine where you will clone project. 
-
-We’ll use our subnet code - main branch [link](https://github.com/bittbridge/bittbridge).  
-
-```bash
-
-# 2.1 Clone the repo
-
-git clone https://github.com/bittbridge/bittbridge
-
-cd bittbridge
-
-
-# 2.2 Create and activate virtual environment
-
-python3 -m venv venv
-
-source venv/bin/activate
-
-# 2.3 Install dependencies in editable mode
-
-pip install -e .
-
-# Dependencies that should be to run:
-pip install bittensor
-pip install bittensor-cli
-pip install wandb
-pip install pytz
-
-```
-  
-Reference (step №1): 
-
-🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
-
----
-## Step 2 – Create Wallets (Validator, Miner)
-
-Follow the instructions to create wallets, you need to create 2 wallets:
-a) One for - Miner
-b) Second for - Validator
-
-```bash
-btcli w create
-```
-
-> ⚠️ Store mnemonic phrases for coldkey and hotkey, you will end up with **4** mnemonic
-
-Reference (step №2): 
-🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
-
----
-## Step 3 – (Optional) Get faucet tokens
-
-If you don't have sufficient faucet (tTAO) tokens, ask the [Bittensor Discord](https://discord.com/channels/799672011265015819/830068283314929684) community for faucet tokens.
-Workflow to get tokends:
-1) Go to Bittensor discord channel
-2) Go to help forum channel -> Requests for Testnet TAO
-3) Leave request according to a special format mentioned in pinned message in this channel.
-4) After some time you will receive on wallet your requested for tTAO, you can check balance with:
-```bash
-btcli w balance --network test
-# Wallet name with balance
-```
-
-> ⚠️ If you have any issues or you're waiting tTAO more than 1 day -> ask Dmitrii to send it to you.
-
-## Step 4 – Transfer Tokens to Wallets
-
-Check wallet which should have tTAO balance.
-
-```bash
-btcli w balance --network test
-# Wallet name with balance
-```
-
-Transfer tTAO from a wallet with a balance small amount to Miner & Validator wallets (to the wallets you just created), follow these commands:
-
-```bash
-# For miner:
-btcli wallet transfer \
---amount 1 \
---wallet.name WALLET_NAME_WITH_tTAO \
---destination MINER_WALLET_COLDKEY_ADDRESS \
---network test
-
-# For validator:
-btcli wallet transfer \
---amount 1 \
---wallet.name WALLET_NAME_WITH_tTAO \
---destination VALIDATOR_WALLET_COLDKEY_ADDRESS \
---network test
-
-```
-
----
-## Step 5 – Check if subnet is running on a blockchain
-
-Verify with:
-
-```bash
-
-btcli subnet show --network test --netuid 420
-
-```
-
----
-## Step 6 – Register Validator & Miner Hotkeys
-
-```bash
-
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
-
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
-
-```
-
-Optional checks:
-
-```bash
-
-btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --subtensor.network test
-
-btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network test
-
-```
-
----
-## Step 7 – Collect your API key at CoinGecko so Validator can evaluate Miner's work 
-
-#### Obtain & Setup CoinGecko API Key (Validators Only)
-
-Before starting the process, validators would be required to procure a CoinGecko API Key. Please follow the instructions mentioned below:  
-
-- Log in to [CoinGecko](https://www.coingecko.com/en/developers/dashboard) and generate an API key in your account settings.
-- Save it somewhere for next step
-
-## Step 8 – Collect your API at WandB to store validator's work
-
-#### Obtain & Setup WandB API Key (Validators Only)
-
-Before starting the process, validators would be required to procure a WANDB API Key. Please follow the instructions mentioned below:  
-
-- Log in to [Weights & Biases](https://wandb.ai/) and generate an API key in your account settings.
-- Save it somewhere for next step
-
-For help finding your wandb api key, look [here](https://docs.wandb.ai/support/find_api_key/)
-
----
-## Step 9 – Run Miner & Validator
-
-Run these commands **from the `bittbridge` directory with activated venv**:
-
-> ⚠️ !!! **Run in 2 different terminals:** !!!
-> ⚠️ !!! **Be sure that venv is activated in both terminals ** !!!
-
-**Terminal A – Validator**
-```bash
-
-# Validator
-# In the terminal where you will start validator paste these commands:
-
-# Set the variable `COINGECKO_API_KEY` in your environment:
-export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
-
-# Set the variable `WANDB_API_KEY` in your environment:
-export WANDB_API_KEY="PASTE_YOUR_API_KEY"
-
-# Run validator 
-python3 -m neurons.validator \
-  --netuid 420 \
-  --subtensor.network test \
-  --wallet.name YOUR_VALIDATOR_NAME \
-  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
-  --logging.debug
-```
-
-**Terminal B – Miner**
-```bash
-# Miner
-# Set the variable `COINGECKO_API_KEY` in your environment for testing purposes:
-export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
-
-python3 -m neurons.miner \
-  --netuid 420 \
-  --subtensor.network test \
-  --wallet.name YOUR_MINER_NAME \
-  --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
-  --logging.debug
-```
+This subnet is **experimental and research-oriented** — focused on testing how decentralized intelligence can improve financial forecasting.
 
 ---
 
-## Final Checklist
+## ⚙️ How It Works  
 
-| ✅   | Task                                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------------------ |
-|     | new directory created                                                                                        |
-|     | venv created & activated                                                                                     |
-|     | Repo cloned (`bittbridge/`) and dependencies installed                                                       |
-|     | Two wallets created: miner & validator (each has cold+hot); mnemonics stored; `btcli wallet list` shows them |
-|     | Have tTAO on testnet (via Discord faucet or Dmitrii)                                                         |
-|     | Sent small tTAO to both coldkeys (`btcli wallet transfer --dest ...`)                                        |
-|     | Registered miner hotkey to subnet `netuid 420`                                                               |
-|     | Registered validator hotkey to subnet `netuid 420`                                                           |
-|     | Validator: CoinGecko API key + W&B API key set;                                                              |
-|     | Two terminals open: validator terminal has env vars (CoinGecko & WandB) exported                             |
-|     | Validator launched with                                                                                      |
-|     | Miner launched with                                                                                          |
-|     | Logs show metagraph sync and request/response traffic                                                        |
+1. **Miners** provide one-hour-ahead predictions for the USD/CNY exchange rate.
+   Each forecast includes a **point estimate** and an **interval** representing confidence.  
+2. **Validators** collect predictions, compare them to the ground truth rate (from [CoinGecko](https://www.coingecko.com/en/api)), and compute accuracy scores.  
+3. **Rewards** are distributed based on multi-step evaluation and reputation smoothing.
 
-
----
-## 🚨 Network Connectivity Troubleshooting
-
-**If you see `[NO_SUBMISSION]` errors or validators can't connect to miners, this section is for you!**
-
-### The Problem
-Validators need to connect to miners over the internet. If miners are behind firewalls/routers, validators can't reach them.
-
-### Quick Diagnosis
-
-**Test if your miner & validator is accessible from the internet:**
-```bash
-# From any external machine (not your local network)
-telnet YOUR_EXTERNAL_IP YOUR_MINER_PORT
-
-# Example:
-telnet 69.115.169.144 8091
 ```
+    ┌──────────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
+    │       Miners         │       │      Validators      │       │       Rewards        │
+    │          ↓           │ ----→ │          ↓           │ ----→ │          ↓           │
+    │     Predictions      │       │       Scoring        │       │ Distributed on-chain │
+    └──────────────────────┘       └──────────────────────┘       └──────────────────────┘
 
-**Expected results:**
-- ✅ **Connection successful** = Your miner & validator is accessible
-- ❌ **Connection refused/hangs** = Your miner & validator is not accessible (needs port forwarding)
-
-### Solution: Port Forwarding
-
-**Step 1: Find your internal IP**
-```bash
-ifconfig | grep inet
-# Look for something like: inet 192.168.1.63
 ```
-
-**Step 2: Access your router admin panel**
-- Usually: http://192.168.1.1 or http://192.168.0.1
-- Login with router credentials
-
-**Step 3: Add port forwarding rule**
-- **Service Name**: Bittensor Miner
-- **External Port**: 8091 (or your chosen port)
-- **Internal IP**: 192.168.1.63 (your machine's internal IP)
-- **Internal Port**: 8091 (same as external)
-- **Protocol**: TCP
-
-**Step 4: Restart your miner with explicit port**
-```bash
-python neurons/miner.py --axon.port 8091 --axon.external_port 8091 --netuid 420
-```
-
-### Alternative: Use Different Ports
-
-If your ISP blocks certain ports, try:
-```bash
-# Common ports that are usually open
-python neurons/miner.py --axon.port 80 --axon.external_port 80 --netuid 420
-python neurons/miner.py --axon.port 8080 --axon.external_port 8080 --netuid 420
-python neurons/miner.py --axon.port 443 --axon.external_port 443 --netuid 420
-```
-
-### Testing Connectivity
-
-**From your machine:**
-```bash
-# Test if you can reach your own external IP
-telnet YOUR_EXTERNAL_IP YOUR_PORT
-```
-
-**From external machine (VPS/friend's machine):**
-```bash
-# Test if external machines can reach your miner
-telnet YOUR_EXTERNAL_IP YOUR_PORT
-```
-
-### Common Issues & Solutions
-
-| Issue | Solution |
-|-------|----------|
-| `Connection refused` | Port forwarding not configured |
-| `Connection hangs/timeout` | Firewall blocking or ISP restrictions |
-| `Cannot connect to host` | Wrong IP address or port |
-| `100% packet loss on ping` | ICMP blocked (normal), test with telnet instead |
-
-### Firewall Configuration
-
-**Linux/macOS:**
-```bash
-# Allow incoming connections
-sudo ufw allow 8091
-# or
-sudo iptables -A INPUT -p tcp --dport 8091 -j ACCEPT
-```
-
-**Windows:**
-- Windows Defender Firewall → Inbound Rules → New Rule → Port → TCP 8091
-
-### VPS Validators
-
-If running validators on VPS:
-- VPS usually has open outbound connections
-- Main issue is miners not being accessible from VPS
-- Follow port forwarding steps above
-
-### Success Indicators
-
-✅ **Working correctly:**
-```
-[COLLECT] UID=3, Prediction=7.2456, Interval=[7.1200, 7.3700]
-```
-
-❌ **Not working:**
-```
-[NO_SUBMISSION] UID=3 provided no prediction - will receive zero reward
-```
-
 ---
 
 
-```
+## 💰 Incentive Mechanism  
 
-## License
-This repository is licensed under the MIT License.
-```text
+Our scoring design ensures that miners are rewarded for **accuracy**, **confidence**, and **consistency**.
+
+**Step 1 – Point Forecast Evaluation**  
+- Miners are ranked by how close their prediction is to the actual rate.  
+- Smaller error = higher score.  
+
+**Step 2 – Interval Forecast Evaluation**  
+- Forecast intervals are checked for whether the actual price falls inside.  
+- Narrower intervals (that still capture the truth) score higher.  
+
+**Step 3 – Combined Share**  
+- Point and interval scores are averaged for a balanced reward.  
+
+**Step 4 – Exponential Moving Average (EMA)**  
+- Each miner’s final weight blends new performance with historical performance:  
+  **wₜ = 0.58 × sₜ + 0.42 × wₜ₋₁**
+- This stabilizes reputation and reduces the impact of lucky guesses.  
+
+🔗 For full scoring examples and formulas, see the [Incentive Mechanism Methodology](docs/incentive_methodology.md).
+
+---
+
+## 🧠 Roles in the Subnet  
+
+- **Miners** → Submit hourly predictions (expected value + range).  
+- **Validators** → Evaluate forecasts, compute scores, and submit weights.  
+- **Observers/Users** → Access results for analytics, visualization, financial modeling, applications, or any other purpose that benefits from decentralized predictive insights.
+
+---
+
+## 🚀 Getting Started  
+
+### Run a Miner  
+Follow the step-by-step guide here: [Miner Setup](docs/running_miner_guide.md)
+
+### Run a Validator  
+Follow the setup guide here: [Validator Setup](docs/running_validator_guide.md)
+
+---
+
+## 🔒 Integrity  
+
+- **Hash Verification:** All model files and predictions are hashed (SHA-256).  
+- **Cutoff Enforcement:** Predictions must be submitted before each round’s deadline.  
+- **Reputation Decay:** Inactive miners gradually lose weight (EMA decay).  
+
+---
+
+## 🧭 Roadmap  
+
+| Phase | Milestone | Status |
+|-------|------------|--------|
+| Q4 2025 | Launch testnet for USD/CNY pair | ✅ |
+| Q1 2026 | Public leaderboard and analytics dashboard | 🔜 |
+| Q2 2026 | Expand to multiple currency pairs | 🔜 |
+| Q3 2026 | Introduce backtesting-based scoring | 🔜 |
+
+---
+
+## ⚖️ License  
+
+This repository is licensed under the MIT License:
+
+```
 # The MIT License (MIT)
 # Copyright © 2024 Opentensor Foundation
 
@@ -386,4 +140,5 @@ This repository is licensed under the MIT License.
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+
 ```
