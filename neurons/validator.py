@@ -124,6 +124,23 @@ class Validator(BaseValidatorNeuron):
                             alpha=self.alpha
                         )
                         
+                        
+                        # Map index-keyed weights, which are aligned with responses, to real UIDs for W&B
+                        if isinstance(updated_weights, dict):
+                             self.moving_average_scores = {
+                                  int(miner_uids[int(i)]): float(v)
+                                  for i, v in updated_weights.items()
+                                  if 0 <= int(i) < len(miner_uids)
+                                  }
+                        elif isinstance(updated_weights, (list, tuple)):
+                             self.moving_average_scores = {
+                                  int(miner_uids[i]): float(v)
+                                  for i, v in enumerate(updated_weights)
+                                  if 0 <= i < len(miner_uids)
+                                  }
+                        else:
+                             self.moving_average_scores = {}
+                        
                         # Update scores using the new reward system
                         self.update_scores(rewards, miner_uids)
                         
