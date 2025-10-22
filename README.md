@@ -40,9 +40,9 @@
 
 ## 💱 Introduction  
 
-The FXspresso Subnet utilizes Bittensor’s decentralized intelligence framework to generate probabilistic, data-driven forecasts of the USD/CNY exchange rate through a network of competing and cooperating models.
+The FXspresso Subnet utilizes Bittensor’s decentralized intelligence framework to generate probabilistic, data-driven forecasts of the USD/CNY exchange rate through a network of independent, competing models.
 
-Participants compete and collaborate to produce accurate and well-calibrated forecasts, while validators ensure transparent and fair evaluation.
+Miners compete to generate accurate and well-calibrated forecasts, while validators evaluate their accuracy and reliability through a transparent on-chain scoring process that ensures fair and accountable assessment.
 
 This subnet is **experimental and research-oriented** — focused on testing how decentralized intelligence can improve financial forecasting.
 
