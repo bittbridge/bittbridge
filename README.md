@@ -90,20 +90,15 @@ Reference (step №2):
 🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
 
 ---
-## Step 3 – (Optional) Get faucet tokens
+## Step 3 – Get faucet tokens
 
-If you don't have sufficient faucet (tTAO) tokens, ask the [Bittensor Discord](https://discord.com/channels/799672011265015819/830068283314929684) community for faucet tokens.
-Workflow to get tokends:
-1) Go to Bittensor discord channel
-2) Go to help forum channel -> Requests for Testnet TAO
-3) Leave request according to a special format mentioned in pinned message in this channel.
-4) After some time you will receive on wallet your requested for tTAO, you can check balance with:
+> ⚠️ Ask Dmitrii to send tTAO to you.
+
+After some time you will receive on wallet your requested for tTAO, you can check balance with:
 ```bash
 btcli w balance --network test
 # Wallet name with balance
 ```
-
-> ⚠️ If you have any issues or you're waiting tTAO more than 1 day -> ask Dmitrii to send it to you.
 
 ## Step 4 – Transfer Tokens to Wallets
 
