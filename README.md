@@ -163,7 +163,7 @@ btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network t
 ---
 ## Step 7 – Collect your API key at CoinGecko so Validator can evaluate Miner's work 
 
-#### Obtain & Setup CoinGecko API Key (Validators Only)
+#### Obtain & Setup CoinGecko API Key
 
 Before starting the process, validators would be required to procure a CoinGecko API Key. Please follow the instructions mentioned below:  
 
