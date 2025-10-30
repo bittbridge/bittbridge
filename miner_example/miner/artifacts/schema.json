@@ -1,0 +1,12 @@
+{
+  "features": [
+    "hour",
+    "hour_sin",
+    "hour_cos",
+    "dow",
+    "dow_sin",
+    "dow_cos"
+  ],
+  "target": "next_close",
+  "interval": "fixed_width_derived_from_residuals"
+}

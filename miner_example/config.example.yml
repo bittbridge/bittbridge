@@ -1,0 +1,13 @@
+mode: local  # local | testnet | mainnet
+
+model:
+  backend: sklearn  # sklearn | custom
+  artifact_path: bittbridge/miner_example/miner/artifacts/model.pkl
+
+update:
+  on_start: true
+
+logging:
+  level: INFO
+
+
