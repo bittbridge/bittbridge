@@ -301,7 +301,10 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Create and run the miner
-    with Miner(model=model) as miner:
+    bt.logging.info("Creating miner instance...")
+    miner_instance = Miner(model=model)
+    bt.logging.info("Entering miner context manager...")
+    with miner_instance as miner:
         bt.logging.info("Miner started. Waiting for challenges from validators...")
         while True:
             bt.logging.info(f"Miner running... {time.time()}")
