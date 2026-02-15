@@ -144,9 +144,9 @@ btcli subnet show --network test --netuid 420
 
 ```bash
 
-btcli subnet register --netuid 420 --Subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
+btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
 
-btcli subnet register --netuid 420 --Subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
+btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
 
 ```
 
@@ -154,9 +154,9 @@ Optional checks:
 
 ```bash
 
-btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --Subtensor.network test
+btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --subtensor.network test
 
-btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --Subtensor.network test
+btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network test
 
 ```
 
@@ -204,7 +204,7 @@ export WANDB_API_KEY="PASTE_YOUR_API_KEY"
 # Run validator 
 python3 -m neurons.validator \
   --netuid 420 \
-  --Subtensor.network test \
+  --subtensor.network test \
   --wallet.name YOUR_VALIDATOR_NAME \
   --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
   --logging.debug
@@ -218,7 +218,7 @@ export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
 
 python3 -m neurons.miner \
   --netuid 420 \
-  --Subtensor.network test \
+  --subtensor.network test \
   --wallet.name YOUR_MINER_NAME \
   --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
   --logging.debug
