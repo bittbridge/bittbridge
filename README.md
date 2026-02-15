@@ -17,13 +17,13 @@
 ---
 # Subnet Deployment Guide (Testnet)
 
-> ⚠️ Always double-check which **network/subnet/Wallet** you’re working on during each step
+> ⚠️ Always double-check which **network/subnet/wallet** you’re working on during each step
 
 > ⚠️ Make sure that you're using most recent versions of Bittensor SDK & Btcli 
 
 > ⚠️ For a good practice be sure that you're using Virtual env 
 
-> ⚠️ To know your address / Wallets -> ```*btcli Wallet list*```
+> ⚠️ To know your address / wallets -> ```*btcli wallet list*```
 
 > ⚠️ You should have tTAO to register and stake on a testnet
 
@@ -74,9 +74,9 @@ Reference (step №1):
 🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
 
 ---
-## Step 2 – Create Wallets (Validator, Miner)
+## Step 2 – Create wallets (Validator, Miner)
 
-Follow the instructions to create Wallets, you need to create 2 Wallets:
+Follow the instructions to create wallets, you need to create 2 wallets:
 a) One for - Miner
 b) Second for - Validator
 
@@ -94,36 +94,36 @@ Reference (step №2):
 
 > ⚠️ Ask Dmitrii to send tTAO to you.
 
-After some time you will receive on Wallet your requested for tTAO, you can check balance with:
+After some time you will receive on wallet your requested for tTAO, you can check balance with:
 ```bash
 btcli w balance --network test
-# Wallet name with balance
+# wallet name with balance
 ```
 
-## Step 4 – Transfer Tokens to Wallets
+## Step 4 – Transfer Tokens to wallets
 
-Check Wallet which should have tTAO balance.
+Check wallet which should have tTAO balance.
 
 ```bash
 btcli w balance --network test
-# Wallet name with balance
+# wallet name with balance
 ```
 
-Transfer tTAO from a Wallet with a balance small amount to Miner & Validator Wallets (to the Wallets you just created), follow these commands:
+Transfer tTAO from a wallet with a balance small amount to Miner & Validator wallets (to the wallets you just created), follow these commands:
 
 ```bash
 # For miner:
-btcli Wallet transfer \
+btcli wallet transfer \
 --amount 1 \
---Wallet.name Wallet_NAME_WITH_tTAO \
---destination MINER_Wallet_COLDKEY_ADDRESS \
+--wallet.name wallet_NAME_WITH_tTAO \
+--destination MINER_wallet_COLDKEY_ADDRESS \
 --network test
 
 # For validator:
-btcli Wallet transfer \
+btcli wallet transfer \
 --amount 1 \
---Wallet.name Wallet_NAME_WITH_tTAO \
---destination VALIDATOR_Wallet_COLDKEY_ADDRESS \
+--wallet.name wallet_NAME_WITH_tTAO \
+--destination VALIDATOR_wallet_COLDKEY_ADDRESS \
 --network test
 
 ```
@@ -144,9 +144,9 @@ btcli subnet show --network test --netuid 420
 
 ```bash
 
-btcli subnet register --netuid 420 --Subtensor.network test --Wallet.name YOUR_MINER_NAME --Wallet.hotkey YOUR_MINER_HOTKEY_NAME
+btcli subnet register --netuid 420 --Subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
 
-btcli subnet register --netuid 420 --Subtensor.network test --Wallet.name YOUR_VALIDATOR_NAME --Wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
+btcli subnet register --netuid 420 --Subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
 
 ```
 
@@ -154,9 +154,9 @@ Optional checks:
 
 ```bash
 
-btcli Wallet overview --Wallet.name YOUR_VALIDATOR_HOTKEY_NAME --Subtensor.network test
+btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --Subtensor.network test
 
-btcli Wallet overview --Wallet.name YOUR_MINER_HOTKEY_NAME --Subtensor.network test
+btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --Subtensor.network test
 
 ```
 
@@ -205,8 +205,8 @@ export WANDB_API_KEY="PASTE_YOUR_API_KEY"
 python3 -m neurons.validator \
   --netuid 420 \
   --Subtensor.network test \
-  --Wallet.name YOUR_VALIDATOR_NAME \
-  --Wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
+  --wallet.name YOUR_VALIDATOR_NAME \
+  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
   --logging.debug
 ```
 
@@ -219,8 +219,8 @@ export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
 python3 -m neurons.miner \
   --netuid 420 \
   --Subtensor.network test \
-  --Wallet.name YOUR_MINER_NAME \
-  --Wallet.hotkey YOUR_MINER_HOTKEY_NAME \
+  --wallet.name YOUR_MINER_NAME \
+  --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
   --logging.debug
 ```
 
@@ -233,9 +233,9 @@ python3 -m neurons.miner \
 |     | new directory created                                                                                        |
 |     | venv created & activated                                                                                     |
 |     | Repo cloned (`bittbridge/`) and dependencies installed                                                       |
-|     | Two Wallets created: miner & validator (each has cold+hot); mnemonics stored; `btcli Wallet list` shows them |
+|     | Two wallets created: miner & validator (each has cold+hot); mnemonics stored; `btcli wallet list` shows them |
 |     | Have tTAO on testnet (via Discord faucet or Dmitrii)                                                         |
-|     | Sent small tTAO to both coldkeys (`btcli Wallet transfer --dest ...`)                                        |
+|     | Sent small tTAO to both coldkeys (`btcli wallet transfer --dest ...`)                                        |
 |     | Registered miner hotkey to subnet `netuid 420`                                                               |
 |     | Registered validator hotkey to subnet `netuid 420`                                                           |
 |     | Validator: CoinGecko API key + W&B API key set;                                                              |
