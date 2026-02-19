@@ -1,384 +1,87 @@
 <div align="center">
 
-# **Bittbridge** <!-- omit in toc -->
+# **Bittbridge**
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bittbridge/bittbridge)
 
 ---
 
-## The Incentivized Internet <!-- omit in toc -->
+## The Incentivized AI
 
 [Discord](https://discord.gg/) • [Network](https://taostats.io/)
 </div>
 
 ---
-- [Quickstarter guide](#Subnet_Deployment_Guide)
-- [License](#license)
 
----
-# Subnet Deployment Guide (Testnet)
+## What is Bittbridge?
 
-> ⚠️ Always double-check which **network/subnet/wallet** you’re working on during each step
+Bittbridge is a Bittensor subnet for USDT/CNY price prediction. **Miners** serve predictions; **Validators** score them and set weights. The subnet rewards accurate predictions.
 
-> ⚠️ Make sure that you're using most recent versions of Bittensor SDK & Btcli 
+### High-Level Flow
 
-> ⚠️ For a good practice be sure that you're using Virtual env 
-
-> ⚠️ To know your address / wallets -> ```*btcli wallet list*```
-
-> ⚠️ You should have tTAO to register and stake on a testnet
-
-> 🚨 **CRITICAL**: Miner & Validator must be accessible from the internet - be sure it's port forwarding configured on your router! (see troubleshooting section)
-
----
-## **Prerequisites**
-
- For Windows you should have [**WSL 2** (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/about) 
- For Windows use Linux Ubuntu to run this guide ☝️
-
----
-## Step 1 – Clone Template & Set Up Environment
-
-> ⚠️ Create directory / folder on your machine where you will clone project. 
-
-We’ll use our subnet code - main branch [link](https://github.com/bittbridge/bittbridge).  
-
-```bash
-
-# 2.1 Clone the repo
-
-git clone https://github.com/bittbridge/bittbridge
-
-cd bittbridge
-
-
-# 2.2 Create and activate virtual environment
-
-python3 -m venv venv
-
-source venv/bin/activate
-
-# 2.3 Install dependencies in editable mode
-
-pip install -e .
-
-# Dependencies that should be to run:
-pip install bittensor
-pip install bittensor-cli
-pip install wandb
-pip install pytz
-
-```
-  
-Reference (step №1): 
-
-🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
-
----
-## Step 2 – Create wallets (Validator, Miner)
-
-Follow the instructions to create wallets, you need to create 2 wallets:
-a) One for - Miner
-b) Second for - Validator
-
-```bash
-btcli w create
+```mermaid
+flowchart LR
+    subgraph validators [Validators]
+        V1[Validator]
+    end
+    subgraph miners [Miners]
+        M1[Miner]
+    end
+    subgraph chain [Bittensor Chain]
+        S[Subnet 420]
+    end
+    V1 -->|"Challenge"| M1
+    M1 -->|"Prediction"| V1
+    V1 -->|"Set weights"| S
+    S -->|"Rewards"| M1
 ```
 
-> ⚠️ Store mnemonic phrases for coldkey and hotkey, you will end up with **4** mnemonic
-
-Reference (step №2): 
-🔗 https://github.com/opentensor/bittensor-subnet-template/blob/main/docs/running_on_testnet.md
-
----
-## Step 3 – Get faucet tokens
-
-> ⚠️ Ask Dmitrii to send tTAO to you.
-
-After some time you will receive on wallet your requested for tTAO, you can check balance with:
-```bash
-btcli w balance --network test
-# wallet name with balance
-```
-
-## Step 4 – Transfer Tokens to wallets
-
-Check wallet which should have tTAO balance.
-
-```bash
-btcli w balance --network test
-# wallet name with balance
-```
-
-Transfer tTAO from a wallet with a balance small amount to Miner & Validator wallets (to the wallets you just created), follow these commands:
-
-```bash
-# For miner:
-btcli wallet transfer \
---amount 1 \
---wallet.name wallet_NAME_WITH_tTAO \
---destination MINER_wallet_COLDKEY_ADDRESS \
---network test
-
-# For validator:
-btcli wallet transfer \
---amount 1 \
---wallet.name wallet_NAME_WITH_tTAO \
---destination VALIDATOR_wallet_COLDKEY_ADDRESS \
---network test
-
-```
-
----
-## Step 5 – Check if subnet is running on a blockchain
-
-Verify with:
-
-```bash
-
-btcli subnet show --network test --netuid 420
-
-```
-
----
-## Step 6 – Register Validator & Miner Hotkeys
-
-```bash
-
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
-
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name YOUR_VALIDATOR_NAME --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME
-
-```
-
-Optional checks:
-
-```bash
-
-btcli wallet overview --wallet.name YOUR_VALIDATOR_HOTKEY_NAME --subtensor.network test
-
-btcli wallet overview --wallet.name YOUR_MINER_HOTKEY_NAME --subtensor.network test
-
-```
-
----
-## Step 7 – Collect your API key at CoinGecko so Validator can evaluate Miner's work 
-
-#### Obtain & Setup CoinGecko API Key
-
-Before starting the process, validators would be required to procure a CoinGecko API Key. Please follow the instructions mentioned below:  
-
-- Log in to [CoinGecko](https://www.coingecko.com/en/developers/dashboard) and generate an API key in your account settings.
-- Save it somewhere for next step
-
-## Step 8 – Collect your API at WandB to store validator's work
-
-#### Obtain & Setup WandB API Key (Validators Only)
-
-Before starting the process, validators would be required to procure a WANDB API Key. Please follow the instructions mentioned below:  
-
-- Log in to [Weights & Biases](https://wandb.ai/) and generate an API key in your account settings.
-- Save it somewhere for next step
-
-For help finding your wandb api key, look [here](https://docs.wandb.ai/support/find_api_key/)
-
----
-## Step 9 – Run Miner & Validator
-
-Run these commands **from the `bittbridge` directory with activated venv**:
-
-> ⚠️ !!! **Run in 2 different terminals:** !!!
-> ⚠️ !!! **Be sure that venv is activated in both terminals ** !!!
-
-**Terminal A – Validator**
-```bash
-
-# Validator
-# In the terminal where you will start validator paste these commands:
-
-# Set the variable `COINGECKO_API_KEY` in your environment:
-export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
-
-# Set the variable `WANDB_API_KEY` in your environment:
-export WANDB_API_KEY="PASTE_YOUR_API_KEY"
-
-# Run validator 
-python3 -m neurons.validator \
-  --netuid 420 \
-  --subtensor.network test \
-  --wallet.name YOUR_VALIDATOR_NAME \
-  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
-  --logging.debug
-```
-
-**Terminal B – Miner**
-```bash
-# Miner
-# Set the variable `COINGECKO_API_KEY` in your environment for testing purposes:
-export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
-
-python3 -m neurons.miner \
-  --netuid 420 \
-  --subtensor.network test \
-  --wallet.name YOUR_MINER_NAME \
-  --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
-  --logging.debug
-```
+Validators send challenges to miners. Miners respond with predictions. Validators evaluate accuracy, set weights on-chain, and miners earn rewards based on their scores.
 
 ---
 
+## Quick Start
+
+1. **You need:** GitHub account, GCP free trial, tTAO (testnet tokens)
+2. **Standard path:** Deploy on a GCP VM (recommended)
+3. **Follow the guide:** Step-by-step instructions below
+
+---
+
+## Guide
+
+| # | Topic | Description |
+|---|-------|-------------|
+| 1 | [Before You Start](docs/guide/01-before-you-start.md) | GitHub, concepts, versioning |
+| 2 | [Local Setup](docs/guide/02-local-setup.md) | Fork, clone, environment |
+| 3 | [Training Custom Model](docs/guide/03-training-custom-model.md) | Jupyter, LSTM_outside_example, plug in |
+| 4 | [GCP VM Setup](docs/guide/04-gcp-vm-setup.md) | Ubuntu, tmux, venv, firewall |
+| 5 | [Wallets and Tokens](docs/guide/05-wallets-and-tokens.md) | On VM: create/import, tTAO, register |
+| 6 | [Run Miner](docs/guide/06-run-miner.md) | On GCP VM |
+| 7 | [Run Validator](docs/guide/07-run-validator.md) | On GCP VM |
+| 8 | [Local Run (Advanced)](docs/guide/08-local-run-advanced.md) | Run everything locally instead of VM |
+| 9 | [Troubleshooting](docs/guide/09-troubleshooting.md) | Port forwarding, connectivity |
+
+---
 ## Final Checklist
 
-| ✅   | Task                                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------------------ |
-|     | new directory created                                                                                        |
-|     | venv created & activated                                                                                     |
-|     | Repo cloned (`bittbridge/`) and dependencies installed                                                       |
-|     | Two wallets created: miner & validator (each has cold+hot); mnemonics stored; `btcli wallet list` shows them |
-|     | Have tTAO on testnet (via Discord faucet or Dmitrii)                                                         |
-|     | Sent small tTAO to both coldkeys (`btcli wallet transfer --dest ...`)                                        |
-|     | Registered miner hotkey to subnet `netuid 420`                                                               |
-|     | Registered validator hotkey to subnet `netuid 420`                                                           |
-|     | Validator: CoinGecko API key + W&B API key set;                                                              |
-|     | Two terminals open: validator terminal has env vars (CoinGecko & WandB) exported                             |
-|     | Validator launched with                                                                                      |
-|     | Miner launched with                                                                                          |
-|     | Logs show Metagraph sync and request/response traffic                                                        |
+| ✅ | Task |
+|---|------|
+| | Github repo forked |
+| | Custom ML model created |
+| | VM created |
+| | Repo cloned on VM, venv activated |
+| | Two wallets created or imported (miner & validator); mnemonics stored |
+| | tTAO balance is positive |
+| | Miner and validator hotkeys registered to subnet 420 |
+| | CoinGecko + WandB API keys set |
+| | Miner running in one tmux session |
+| | Validator running in another tmux session |
+| | Detached from tmux (`Ctrl+b` `d`) – both running 24/7 |
+| | Logs show Metagraph sync and request/response traffic |
 
 
 ---
-## 🚨 Network Connectivity Troubleshooting
-
-**If you see `[NO_SUBMISSION]` errors or validators can't connect to miners, this section is for you!**
-
-### The Problem
-Validators need to connect to miners over the internet. If miners are behind firewalls/routers, validators can't reach them.
-
-### Quick Diagnosis
-
-**Test if your miner & validator is accessible from the internet:**
-```bash
-# From any external machine (not your local network)
-telnet YOUR_EXTERNAL_IP YOUR_MINER_PORT
-
-# Example:
-telnet 69.115.169.144 8091
-```
-
-**Expected results:**
-- ✅ **Connection successful** = Your miner & validator is accessible
-- ❌ **Connection refused/hangs** = Your miner & validator is not accessible (needs port forwarding)
-
-### Solution: Port Forwarding
-
-**Step 1: Find your internal IP**
-```bash
-ifconfig | grep inet
-# Look for something like: inet 192.168.1.63
-```
-
-**Step 2: Access your router admin panel**
-- Usually: http://192.168.1.1 or http://192.168.0.1
-- Login with router credentials
-
-**Step 3: Add port forwarding rule**
-- **Service Name**: Bittensor Miner
-- **External Port**: 8091 (or your chosen port)
-- **Internal IP**: 192.168.1.63 (your machine's internal IP)
-- **Internal Port**: 8091 (same as external)
-- **Protocol**: TCP
-
-**Step 4: Restart your miner with explicit port**
-```bash
-python neurons/miner.py --Axon.port 8091 --Axon.external_port 8091 --netuid 420
-```
-
-### Alternative: Use Different Ports
-
-If your ISP blocks certain ports, try:
-```bash
-# Common ports that are usually open
-python neurons/miner.py --Axon.port 80 --Axon.external_port 80 --netuid 420
-python neurons/miner.py --Axon.port 8080 --Axon.external_port 8080 --netuid 420
-python neurons/miner.py --Axon.port 443 --Axon.external_port 443 --netuid 420
-```
-
-### Testing Connectivity
-
-**From your machine:**
-```bash
-# Test if you can reach your own external IP
-telnet YOUR_EXTERNAL_IP YOUR_PORT
-```
-
-**From external machine (VPS/friend's machine):**
-```bash
-# Test if external machines can reach your miner
-telnet YOUR_EXTERNAL_IP YOUR_PORT
-```
-
-### Common Issues & Solutions
-
-| Issue | Solution |
-|-------|----------|
-| `Connection refused` | Port forwarding not configured |
-| `Connection hangs/timeout` | Firewall blocking or ISP restrictions |
-| `Cannot connect to host` | Wrong IP address or port |
-| `100% packet loss on ping` | ICMP blocked (normal), test with telnet instead |
-
-### Firewall Configuration
-
-**Linux/macOS:**
-```bash
-# Allow incoming connections
-sudo ufw allow 8091
-# or
-sudo iptables -A INPUT -p tcp --dport 8091 -j ACCEPT
-```
-
-**Windows:**
-- Windows Defender Firewall → Inbound Rules → New Rule → Port → TCP 8091
-
-### VPS Validators
-
-If running validators on VPS:
-- VPS usually has open outbound connections
-- Main issue is miners not being accessible from VPS
-- Follow port forwarding steps above
-
-### Success Indicators
-
-✅ **Working correctly:**
-```
-[COLLECT] UID=3, Prediction=7.2456, Interval=[7.1200, 7.3700]
-```
-
-❌ **Not working:**
-```
-[NO_SUBMISSION] UID=3 provided no prediction - will receive zero reward
-```
-
----
-
-
-```
 
 ## License
-This repository is licensed under the MIT License.
-```text
-# The MIT License (MIT)
-# Copyright © 2024 Opentensor Foundation
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-# the Software.
-
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-```
+This repository is licensed under the [MIT License](LICENSE).
