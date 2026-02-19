@@ -21,7 +21,9 @@ This guide walks you through creating a Google Cloud VM, configuring the firewal
 Create a firewall rule **before** the VM so you can apply it during VM creation.
 
 1. Go to **VPC network** → **Firewall** (or search "Firewall" in the top search bar)
+
 <img width="1512" height="854" alt="Screenshot 2026-02-18 at 12 18 51 PM" src="https://github.com/user-attachments/assets/cbcb6989-1329-44b9-a0b2-4beb11d4ac04" />
+
 3. Click **Create firewall rule**
 4. Set:
    - **Name:** `allow-tcp-8091`
