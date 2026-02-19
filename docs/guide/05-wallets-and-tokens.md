@@ -69,7 +69,11 @@ When you see placeholders like `YOUR_MINER_HOTKEY_NAME`, use the name you gave t
 
 ## Get Faucet Tokens
 
-Ask Dmitrii to send tTAO to your miner and validator wallets. You need to send him SS58 coldkey address (starts with "5"), see screenshot. (ADD screenshot)
+Ask Dmitrii to send tTAO to your miner and validator wallets. You need to send him SS58 coldkey address (starts with "5"), see screenshot. 
+
+
+<img width="690" height="84" alt="Screenshot 2026-02-19 at 12 30 29 PM" src="https://github.com/user-attachments/assets/a01ed835-f9fb-43d4-9061-790c073f3366" />
+
 
 Check your balance:
 
