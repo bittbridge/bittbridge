@@ -33,6 +33,8 @@ Create a firewall rule **before** the VM so you can apply it during VM creation.
    - **Protocols and ports:** Check "TCP" and enter `8091`
 5. Click **Create**
 
+
+
 <img width="590" height="721" alt="Screenshot 2026-02-18 at 12 21 09 PM" src="https://github.com/user-attachments/assets/e16045fd-837b-4861-9fa5-f56eafad332f" />
 
 ### Step 4 – Go to VM Instances
