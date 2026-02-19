@@ -54,17 +54,26 @@ Create a firewall rule **before** the VM so you can apply it during VM creation.
 ### Step 6 – Change Boot Disk (OS)
 
 1. Under **Boot disk**, click **Change**
+
 <img width="1512" height="767" alt="Screenshot 2026-02-18 at 12 28 05 PM" src="https://github.com/user-attachments/assets/26cd8692-98a3-4db5-8dbd-b57e6380e286" />
+
+
 3. Select **Ubuntu**
 4. **Version:** Ubuntu 22.04 LTS x86/64
 5. **Disk size:** 25 GB (or more if you have large models)
 6. Click **Select**
+
+
+
 <img width="704" height="758" alt="Screenshot 2026-02-18 at 12 28 50 PM" src="https://github.com/user-attachments/assets/e2f6e48f-63c2-4749-b019-f1e0aa8eaf03" />
 
 ### Step 7 – Create VM
 
 1. Click **Create**
 2. Wait for the VM to start (green checkmark)
+
+
+
 <img width="1512" height="772" alt="Screenshot 2026-02-18 at 12 31 08 PM" src="https://github.com/user-attachments/assets/2e5b2501-3542-4068-bdaf-d2da2c4b0c05" />
 
 ### Step 8 – Connect via SSH
@@ -73,7 +82,9 @@ Create a firewall rule **before** the VM so you can apply it during VM creation.
 2. Authorize if prompted
 3. You should see a terminal prompt, e.g. `your_username@bittbridge-vm:~$`
 
+
 <img width="1512" height="776" alt="Screenshot 2026-02-18 at 12 31 55 PM" src="https://github.com/user-attachments/assets/16c70140-e6ee-41cc-94de-151776090b3b" />
+
 
 <img width="908" height="718" alt="Screenshot 2026-02-18 at 12 32 58 PM" src="https://github.com/user-attachments/assets/97b251c8-066f-4300-a75f-22bbec1a67f2" />
 
