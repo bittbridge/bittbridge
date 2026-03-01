@@ -1,28 +1,9 @@
-# The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
-# Copyright © 2023 <your name>
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-# the Software.
-
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
 
 import os
 import time
-import requests
-import random
-from typing import Tuple
+from typing import Tuple, Optional
 import typing
+import pandas as pd
 import bittensor as bt
 
 # Bittensor Miner Template:
@@ -32,45 +13,62 @@ import bittbridge
 from bittbridge.base.miner import BaseMinerNeuron
 
 # ---------------------------
-# Miner Forward Logic for USDT/CNY Prediction
+# Miner Forward Logic for USDT/CNY Prediction (Moving Average)
 # ---------------------------
 # This implementation is used inside the `forward()` method of the miner neuron.
 # When a validator sends a Challenge synapse, this code:
-#   1. Fetches the current USDT/CNY price from CoinGecko API.
-#   2. Sets that price as the prediction.
-#   3. Estimates a 90% confidence interval using a naive volatility model.
-#   4. Attaches the prediction and interval to the synapse and returns it.
+#   1. Loads price data from neurons/data.csv.
+#   2. Computes a simple moving average of recent Close prices.
+#   3. Uses the MA as the predicted next price.
+#   4. Estimates a 90% confidence interval using a naive volatility model.
+#   5. Attaches the prediction and interval to the synapse and returns it.
 #
 # Validators will later use this to score the miner's accuracy.
 
-# Fetch the current price of USDT in CNY using CoinGecko's public API.
+# Number of 5-minute steps for moving average (12 = 1 hour)
+N_STEPS = 12
 
 
-def fetch_current_usdt_cny() -> float:
-    coingecko_api_key = os.getenv("COINGECKO_API_KEY")
-    if coingecko_api_key is None:
-        bt.logging.error("COINGECKO_API_KEY not found in environment variables.")
+def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepare a DataFrame for time series prediction.
+    Uses timestamp_utc and Close columns from neurons/data.csv.
+    """
+    df = df.copy()
+    df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"])
+    time_series_df = df[["timestamp_utc", "Close"]].copy()
+    time_series_df.columns = ["datetime", "close_price"]
+    time_series_df = time_series_df.set_index("datetime")
+    time_series_df = time_series_df.sort_index()
+    # Drop rows with missing close_price
+    time_series_df = time_series_df.dropna()
+    return time_series_df
+
+
+def predict_next_price_ma(
+    data: pd.DataFrame, n_steps: int = N_STEPS
+) -> Optional[float]:
+    """
+    Predict next price using simple moving average of last n_steps Close prices.
+    Validator always requests a future prediction, so dataset is always older than
+    the request; we simply use the most recent n_steps prices.
+    """
+    if len(data) == 0:
         return None
-        
-    try:
-        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key={coingecko_api_key}")
-        response.raise_for_status()  # Raise exception for HTTP errors (4xx/5xx)
-        return response.json()["tether"]["cny"]
-    except Exception as e:
-        # Log a warning and return None if API call fails
-        bt.logging.warning(f"API error: {e}")
-        return None
 
-# Estimate a naive 90% confidence interval based on a fixed 1% volatility assumption
+    recent_prices = data["close_price"].tail(n_steps)
+    prediction = float(recent_prices.mean())
+    return prediction
+
+
 def estimate_interval(prediction: float) -> Tuple[float, float]:
+    """Estimate a naive 90% confidence interval based on a fixed 1% volatility assumption."""
     std_dev = 0.01  # Assume 1% standard deviation in price
     # Use 1.64 as z-score for 90% confidence in a normal distribution
     lower = prediction - 1.64 * std_dev * prediction
     upper = prediction + 1.64 * std_dev * prediction
     return lower, upper
 
-# This function is triggered when a validator queries this miner.
-# It processes the synapse by providing a prediction and interval.
 
 class Miner(BaseMinerNeuron):
     """
@@ -84,33 +82,47 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
-        # TODO(developer): Anything specific to your use case you can do here
+        # Load price data from neurons/data.csv for moving average prediction
+        data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.csv")
+        if not os.path.exists(data_path):
+            bt.logging.error(f"Data file not found: {data_path}")
+            self._price_data = None
+        else:
+            try:
+                df = pd.read_csv(data_path)
+                self._price_data = prepare_dataframe(df)
+                bt.logging.info(
+                    f"Loaded {len(self._price_data)} rows from {data_path} for MA prediction"
+                )
+            except Exception as e:
+                bt.logging.error(f"Failed to load data: {e}")
+                self._price_data = None
 
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
         Responds to the Challenge synapse from the validator by submitting:
-        - a USDT/CNY price prediction (with added randomness for testing predictions)
-        - a naive confidence interval based on fixed volatility assumption
+        - a USDT/CNY price prediction (moving average of recent Close prices)
+        - a 90% confidence interval based on fixed volatility assumption
         """
-        
-        # Step 1: Fetch the most recent USDT/CNY price
-        price = fetch_current_usdt_cny()
-        
-        # Step 2: If the price couldn't be fetched, skip this round
-        if price is None:
+        # Step 1: If data wasn't loaded, skip this round
+        if self._price_data is None:
             return synapse  # prediction and interval remain None (validator will ignore)
 
-        # Step 3: Add random variation (-0.5 to +0.5)
-        price += random.uniform(-0.5, 0.5)
+        # Step 2: Predict next price using moving average
+        prediction = predict_next_price_ma(self._price_data, n_steps=N_STEPS)
+
+        # Step 3: If prediction failed (insufficient data), skip this round
+        if prediction is None:
+            return synapse
 
         # Step 4: Assign point prediction
-        synapse.prediction = price
+        synapse.prediction = prediction
 
-        # Step 4: Estimate and assign confidence interval
-        synapse.interval = list(estimate_interval(price))
+        # Step 5: Estimate and assign 90% confidence interval
+        synapse.interval = list(estimate_interval(prediction))
 
-        # Step 5: Log successful prediction
-        bt.logging.success(f"Predicted: {price}, Interval: {synapse.interval}")
+        # Step 6: Log successful prediction
+        bt.logging.success(f"Predicted: {prediction}, Interval: {synapse.interval}")
         return synapse
 
     async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:
