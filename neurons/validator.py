@@ -82,7 +82,7 @@ class Validator(BaseValidatorNeuron):
         return await forward(self)
     # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
     # evaluation_delay: the delay in seconds after which the predictions are processed
-    async def evaluation_loop(self, evaluation_delay=3600, check_interval=10):
+    async def evaluation_loop(self, evaluation_delay=120, check_interval=10):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
@@ -205,7 +205,7 @@ async def metagraph_resync_scheduler(validator, resync_interval=600):
 
 async def prediction_scheduler(validator):
     # Set your prediction interval (in minutes)
-    prediction_interval = 5  # Query miners every 5 minutes
+    prediction_interval = 0.5  # Query miners every 30 seconds
     # Initialize timestamp to current time, rounded to interval
     timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
     while True:
@@ -220,7 +220,7 @@ async def prediction_scheduler(validator):
 
 async def main():
     validator = Validator()
-    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=3600, check_interval=10))
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=120, check_interval=10))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
     resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=600))
     await asyncio.gather(eval_task, pred_task, resync_task)
