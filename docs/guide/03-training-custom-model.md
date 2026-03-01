@@ -1,6 +1,8 @@
-# 3. Training Custom Model
+# 3. Training Custom Model (Advanced – Currently Not Working)
 
-To use your own prediction model, train it in a Jupyter notebook and plug it into the miner. Use `miner_model/LSTM_outside_example` as reference.
+> **Note:** This is an advanced path. The basic scenario is to run `neurons/miner.py` (moving average miner) – see [06 – Run Miner](06-run-miner.md). Custom LSTM/RNN model loading via TensorFlow is **currently not working** due to a model-loading bug. Use the built-in moving average miner instead.
+
+To use your own prediction model (when fixed), you would train it in a Jupyter notebook and plug it into the miner. Use `miner_model/LSTM_outside_example` as reference.
 
 ---
 

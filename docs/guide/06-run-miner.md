@@ -18,25 +18,56 @@ You are now inside a tmux session named `miner`
 
 ### Run the miner
 
-Activate venv and run one of the options below:
+Activate venv and run the miner:
 
 ```bash
 cd ~/bittbridge
 source venv/bin/activate
 ```
 
-**Custom model miner**
+**Basic scenario – moving average miner **
+
+```bash
+python -m neurons.miner \
+  --netuid 420 \
+  --subtensor.network test \
+  --wallet.name miner \
+  --wallet.hotkey default \
+  --logging.debug
+```
+
+This uses the built-in moving average model with `neurons/data.csv`
+
+Use the **hotkey name** (e.g., `default`), not the ss58 address.
+
+**Optional: add noise for testing** (e.g., dashboard development with multiple miners)
+
+```bash
+python -m neurons.miner \
+  --netuid 420 \
+  --subtensor.network test \
+  --wallet.name miner \
+  --wallet.hotkey default \
+  --logging.debug \
+  -- test
+```
+
+---
+
+## Advanced: Custom model miner (currently not working)
+
+Training and loading custom LSTM/RNN models via `miner_model` is advanced and **currently not working** due to a TensorFlow model-loading bug. Use the basic moving average miner above instead.
+
+If you need the custom model path for future use:
 
 ```bash
 python -m miner_model.miner_plugin \
   --netuid 420 \
   --subtensor.network test \
-  --wallet.name YOUR_MINER_NAME \
-  --wallet.hotkey YOUR_MINER_HOTKEY_NAME \
+  --wallet.name miner \
+  --wallet.hotkey default \
   --logging.debug
 ```
-
-Use the **hotkey name** (e.g., `default`), not the ss58 address.
 
 ### Detach – leave running 24/7
 

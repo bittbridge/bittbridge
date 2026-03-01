@@ -63,8 +63,6 @@ You must regenerate **both** coldkey and hotkey for each wallet. Use the same wa
 - **`--wallet.name`** = The coldkey/wallet name (e.g., `miner`, `validator`).
 - **`--wallet.hotkey`** = The **hotkey name** (e.g., `default`), **not** the ss58 address.
 
-When you see placeholders like `YOUR_MINER_HOTKEY_NAME`, use the name you gave the hotkey (e.g., `default`), not the ss58 address.
-
 ---
 
 ## Get Faucet Tokens

@@ -40,7 +40,7 @@ def get_actual_usdt_cny() -> float:
         return None
     
     try:
-        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key=coingecko_api_key")
+        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny&precision=4&x_cg_demo_api_key={coingecko_api_key}")
         response.raise_for_status()
         return response.json()["tether"]["cny"]
     except Exception as e:

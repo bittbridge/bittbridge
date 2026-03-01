@@ -51,12 +51,12 @@ ifconfig | grep inet
 Use lowercase flags (`--axon.port`, not `--Axon.port`):
 
 ```bash
-python3 -m neurons.miner --axon.port 8091 --axon.external_port 8091 --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
+python3 -m neurons.miner --axon.port 8091 --axon.external_port 8091 --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
 ```
 
-For custom model miner:
+For custom model miner (advanced, currently not working):
 ```bash
-python -m miner_model.miner_plugin --axon.port 8091 --axon.external_port 8091 --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
+python -m miner_model.miner_plugin --axon.port 8091 --axon.external_port 8091 --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
 ```
 
 ---
@@ -65,9 +65,9 @@ python -m miner_model.miner_plugin --axon.port 8091 --axon.external_port 8091 --
 
 If your ISP blocks certain ports, try:
 ```bash
-python3 -m neurons.miner --axon.port 80 --axon.external_port 80 --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
-python3 -m neurons.miner --axon.port 8080 --axon.external_port 8080 --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
-python3 -m neurons.miner --axon.port 443 --axon.external_port 443 --netuid 420 --subtensor.network test --wallet.name YOUR_MINER_NAME --wallet.hotkey YOUR_MINER_HOTKEY_NAME
+python3 -m neurons.miner --axon.port 80 --axon.external_port 80 --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
+python3 -m neurons.miner --axon.port 8080 --axon.external_port 8080 --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
+python3 -m neurons.miner --axon.port 443 --axon.external_port 443 --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
 ```
 
 ---

@@ -17,7 +17,7 @@ You can do everything described for the GCP VM locally on your laptop. This sect
 Follow the same workflow as the main guide, but perform all steps on your local machine:
 
 1. [02 – Local Setup](02-local-setup.md) – Fork, clone, environment
-2. [03 – Training Custom Model](03-training-custom-model.md) – If using custom model
+2. [03 – Training Custom Model](03-training-custom-model.md) – Optional; advanced, currently not working
 3. Skip GCP VM Setup
 4. [05 – Wallets and Tokens](05-wallets-and-tokens.md) – Create/import wallets, tTAO, register (do this locally)
 5. [06 – Run Miner](06-run-miner.md) – Run locally

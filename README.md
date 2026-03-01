@@ -53,10 +53,10 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 |---|-------|-------------|
 | 1 | [Before You Start](docs/guide/01-before-you-start.md) | GitHub, concepts, versioning |
 | 2 | [Local Setup](docs/guide/02-local-setup.md) | Fork, clone, environment |
-| 3 | [Training Custom Model](docs/guide/03-training-custom-model.md) | Jupyter, LSTM_outside_example, plug in |
+| 3 | [Training Custom Model](docs/guide/03-training-custom-model.md) | Advanced – currently not working (TensorFlow bug) |
 | 4 | [GCP VM Setup](docs/guide/04-gcp-vm-setup.md) | Ubuntu, tmux, venv, firewall |
 | 5 | [Wallets and Tokens](docs/guide/05-wallets-and-tokens.md) | On VM: create/import, tTAO, register |
-| 6 | [Run Miner](docs/guide/06-run-miner.md) | On GCP VM |
+| 6 | [Run Miner](docs/guide/06-run-miner.md) | Basic: `neurons/miner.py` (moving average) |
 | 7 | [Run Validator](docs/guide/07-run-validator.md) | On GCP VM |
 | 8 | [Local Run (Advanced)](docs/guide/08-local-run-advanced.md) | Run everything locally instead of VM |
 | 9 | [Troubleshooting](docs/guide/09-troubleshooting.md) | Port forwarding, connectivity |
@@ -67,14 +67,13 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 | ✅ | Task |
 |---|------|
 | | Github repo forked |
-| | Custom ML model created |
 | | VM created |
 | | Repo cloned on VM, venv activated |
 | | Two wallets created or imported (miner & validator); mnemonics stored |
 | | tTAO balance is positive |
 | | Miner and validator hotkeys registered to subnet 420 |
-| | CoinGecko + WandB API keys set |
-| | Miner running in one tmux session |
+| | CoinGecko + WandB API keys set (validator only) |
+| | Miner running in one tmux session (`python -m neurons.miner`) |
 | | Validator running in another tmux session |
 | | Detached from tmux (`Ctrl+b` `d`) – both running 24/7 |
 | | Logs show Metagraph sync and request/response traffic |
