@@ -24,7 +24,7 @@ You are now inside a tmux session named `validator`
 cd ~/bittbridge
 source venv/bin/activate
 
-export COINGECKO_API_KEY="PASTE_YOUR_COINGECKO_API_KEY_HERE"
+export COINGECKO_API_KEY=PASTE_YOUR_COINGECKO_API_KEY_HERE
 export WANDB_API_KEY="PASTE_YOUR_WANDB_API_KEY"
 
 python3 -m neurons.validator \
