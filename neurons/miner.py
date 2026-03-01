@@ -1,5 +1,6 @@
-
+import argparse
 import os
+import random
 import time
 from typing import Tuple, Optional
 import typing
@@ -79,6 +80,16 @@ class Miner(BaseMinerNeuron):
     This class provides reasonable default behavior for a miner such as blacklisting unrecognized hotkeys, prioritizing requests based on stake, and forwarding requests to the forward function. If you need to define custom
     """
 
+    @classmethod
+    def add_args(cls, parser: argparse.ArgumentParser):
+        super().add_args(parser)
+        parser.add_argument(
+            "--test",
+            action="store_true",
+            help="[Testing only] Add random noise to each prediction so multiple miners produce different values (e.g. for dashboard development).",
+            default=False,
+        )
+
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
 
@@ -98,6 +109,9 @@ class Miner(BaseMinerNeuron):
                 bt.logging.error(f"Failed to load data: {e}")
                 self._price_data = None
 
+        # [Testing only] When --test is set, add noise to predictions so multiple miners produce different values (e.g. for dashboard development)
+        self._add_test_noise = getattr(self.config, "test", False)
+
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
         Responds to the Challenge synapse from the validator by submitting:
@@ -115,13 +129,17 @@ class Miner(BaseMinerNeuron):
         if prediction is None:
             return synapse
 
-        # Step 4: Assign point prediction
+        # Step 4: [Testing only] Add noise so multiple miners produce different predictions (e.g. for dashboard development)
+        if self._add_test_noise:
+            prediction += random.uniform(-0.5, 0.5)
+
+        # Step 5: Assign point prediction
         synapse.prediction = prediction
 
-        # Step 5: Estimate and assign 90% confidence interval
+        # Step 6: Estimate and assign 90% confidence interval
         synapse.interval = list(estimate_interval(prediction))
 
-        # Step 6: Log successful prediction
+        # Step 7: Log successful prediction
         bt.logging.success(f"Predicted: {prediction}, Interval: {synapse.interval}")
         return synapse
 
