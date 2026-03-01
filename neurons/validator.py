@@ -188,7 +188,7 @@ class Validator(BaseValidatorNeuron):
 
 # Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
 # Ensure that validator see new miners that have joined the network.
-async def metagraph_resync_scheduler(validator, resync_interval=600):
+async def metagraph_resync_scheduler(validator, resync_interval=60):
     while True:
         validator.resync_metagraph()
 
