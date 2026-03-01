@@ -26,6 +26,9 @@ source venv/bin/activate
 ```
 
 **Basic scenario – moving average miner **
+You can make changes in moving average period updating N_STEPS variable in neurons/miner.py, by default it is 12 (Number of 5-minute steps for moving average (12 = 1 hour)).
+<img width="682" height="445" alt="Screenshot 2026-03-01 at 4 50 09 PM" src="https://github.com/user-attachments/assets/da02295a-c3d0-4afe-b787-a0ea6790d1f0" />
+
 
 ```bash
 python -m neurons.miner \
