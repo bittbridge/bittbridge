@@ -140,7 +140,10 @@ class Miner(BaseMinerNeuron):
         synapse.interval = list(estimate_interval(prediction))
 
         # Step 7: Log successful prediction
-        bt.logging.success(f"Predicted: {prediction}, Interval: {synapse.interval}")
+        if self._add_test_noise:
+            bt.logging.success(f"Predicted: {prediction}, Interval: {synapse.interval} (with noise)")
+        else:
+            bt.logging.success(f"Predicted: {prediction}, Interval: {synapse.interval}")
         return synapse
 
     async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:
