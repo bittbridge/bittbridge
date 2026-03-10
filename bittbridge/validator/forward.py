@@ -19,10 +19,10 @@
 
 import time
 import asyncio
-from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
 from bittbridge.utils.uids import get_random_uids
+from bittbridge.utils.timestamp import get_next_interval, to_str
 
 
 async def forward(self):
@@ -35,8 +35,9 @@ async def forward(self):
     4. Query miners
     5. Store responses and timestamp
     """
-    # Step 1: Generate timestamp
-    timestamp = datetime.now(timezone.utc).isoformat()
+    # Step 1: Generate timestamp for the *next* 5-min slot (Eastern).
+    # At 10:00 we ask "what will demand be at 10:05?"; after 10:05 we evaluate with actual 10:05.
+    timestamp = to_str(get_next_interval(interval_minutes=5))
 
     # Step 2: Select miners (k comes from self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)

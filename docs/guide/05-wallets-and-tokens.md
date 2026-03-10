@@ -95,10 +95,11 @@ Optional checks (use wallet/coldkey name, not hotkey name):
 
 ## Collect API Keys
 
-### CoinGecko (Validators)
+### ISO-NE (Miner and Validator)
 
-- Log in to [CoinGecko](https://www.coingecko.com/en/developers/dashboard) and generate an API key.
-- Save it for the next step.
+- Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false).
+- Copy `.env.example` to `.env` and add your username and password (`ISO_NE_USERNAME`, `ISO_NE_PASSWORD`).
+- Run `python test.py` to verify API access.
 
 ### WandB (Validators)
 

@@ -27,7 +27,7 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_incentive_mechanism_rewards
+from bittbridge.validator.reward import get_actual_load_mw, reward, get_incentive_mechanism_rewards
 
 # Protocol imports
 from bittbridge.protocol import Challenge
@@ -103,7 +103,7 @@ class Validator(BaseValidatorNeuron):
                 
                 # Process each timestamp group
                 for timestamp, predictions in timestamp_groups.items():
-                    actual = get_actual_usdt_cny()
+                    actual = get_actual_load_mw(timestamp)
                     if actual is not None:
                         # Convert predictions to Challenge objects for incentive mechanism scoring
                         responses = []
@@ -118,7 +118,7 @@ class Validator(BaseValidatorNeuron):
                         
                         # Use incentive mechanism for scoring
                         rewards, updated_weights = get_incentive_mechanism_rewards(
-                            actual_price=actual,
+                            actual_load_mw=actual,
                             responses=responses,
                             previous_weights=self.previous_weights,
                             alpha=self.alpha
@@ -159,7 +159,7 @@ class Validator(BaseValidatorNeuron):
                                 f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
                                 f"Interval={pred.get('interval')}, "
-                                f"Actual={actual}, "
+                                f"Actual LoadMw={actual}, "
                                 f"Reward={rewards[i]:.4f}"
                             )
                 
@@ -205,7 +205,7 @@ async def metagraph_resync_scheduler(validator, resync_interval=60):
 
 async def prediction_scheduler(validator):
     # Set your prediction interval (in minutes)
-    prediction_interval = 5  # Query miners every 1 minute
+    prediction_interval = 5  # Query miners every 5 minute
     # Initialize timestamp to current time, rounded to interval
     timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
     while True:
@@ -227,4 +227,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     asyncio.run(main())

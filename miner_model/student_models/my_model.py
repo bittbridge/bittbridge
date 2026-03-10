@@ -90,7 +90,7 @@ data = prepare_dataframe(df)  # Helper handles all the formatting!
 
 def predict(timestamp):
     """
-    Predict USDT/CNY price 1 hour ahead.
+    Predict New England LoadMw 1 hour ahead.
     
     Uses the standard prediction pattern via helper function.
     You can customize the parameters below if needed.

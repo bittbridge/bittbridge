@@ -10,8 +10,8 @@ To use your own prediction model (when fixed), you would train it in a Jupyter n
 
 The folder [miner_model/LSTM_outside_example/](../../miner_model/LSTM_outside_example/) contains:
 
-- `USDT_CNY_RNN_LSTM.ipynb` – Jupyter notebook that trains an LSTM model
-- `USDT-CNY_scraper.csv` – Data file used for training
+- `USDT_CNY_RNN_LSTM.ipynb` – Jupyter notebook (legacy USDT/CNY; for LoadMw use energydata.csv or ISO-NE API data)
+- Data: use energydata.csv (Total Load) or fetch from ISO-NE API for LoadMw training
 - `lstm_model.h5` – Saved model
 
 Open the notebook to understand the workflow: load data, train, save model as `.h5`.
@@ -22,7 +22,7 @@ Open the notebook to understand the workflow: load data, train, save model as `.
 
 1. **Use compatible TensorFlow** – Check `miner_model/requirements.txt` (e.g., `tensorflow>=2.13.0`). Train with a version that matches what the VM will use.
 
-2. **Train in Jupyter** – Run the notebook -> You should train model on provided data (`USDT-CNY_scraper.csv`). Save the model:
+2. **Train in Jupyter** – Run the notebook -> Train on LoadMw data (energydata.csv or API-derived). Save the model:
    ```python
    model.save('my_model.h5')
    ```

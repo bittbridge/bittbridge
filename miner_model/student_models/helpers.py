@@ -11,13 +11,13 @@ import numpy as np
 
 def get_recent_prices(data, timestamp, n_steps=12):
     """
-    Get the last n_steps prices before the given timestamp.
+    Get the last n_steps values before the given timestamp.
     
-    This is the standard function for getting historical prices needed for prediction.
-    Works with any DataFrame that has a datetime index and a 'close_price' column.
+    Works with any DataFrame that has a datetime index and a target column
+    ('close_price' or 'load_mw'). Supports both price and LoadMw (energy demand) data.
     
     Args:
-        data: DataFrame with datetime index and 'close_price' column
+        data: DataFrame with datetime index and 'close_price' or 'load_mw' column
         timestamp: ISO format timestamp string (e.g., "2024-01-15T10:30:00+00:00")
         n_steps: Number of timesteps to retrieve (default: 12 = 1 hour for 5-min data)
     
@@ -35,19 +35,20 @@ def get_recent_prices(data, timestamp, n_steps=12):
     if len(available_data) < n_steps:
         return None
     
-    recent_prices = available_data['close_price'].tail(n_steps).values
-    # Reshape for model input: (1, n_steps, 1)
-    return recent_prices.reshape(1, n_steps, 1)
+    # Prefer load_mw for energy demand, fall back to close_price
+    value_col = 'load_mw' if 'load_mw' in data.columns else 'close_price'
+    recent_values = available_data[value_col].tail(n_steps).values
+    return recent_values.reshape(1, n_steps, 1)
 
 
 def calculate_interval(prediction, method='fixed', std_error=None, percentage=0.01):
     """
     Calculate 90% confidence interval for a prediction.
     
-    Standard function for calculating prediction intervals.
+    Works for both price and LoadMw (load in MW) predictions.
     
     Args:
-        prediction: The predicted price (float)
+        prediction: The predicted value (float) - price or LoadMw
         method: 'fixed' (use percentage) or 'std' (use standard error)
         std_error: Standard error/standard deviation (for 'std' method)
         percentage: Percentage of prediction to use as margin (for 'fixed' method, default: 1%)
@@ -56,13 +57,8 @@ def calculate_interval(prediction, method='fixed', std_error=None, percentage=0.
         List [lower_bound, upper_bound] for 90% confidence interval
     
     Example:
-        # Using fixed percentage
-        interval = calculate_interval(7.25, method='fixed', percentage=0.01)
-        # Returns: [7.1775, 7.3225]
-        
-        # Using standard error
-        interval = calculate_interval(7.25, method='std', std_error=0.002586)
-        # Returns: [7.2458, 7.2542]
+        # Using fixed percentage (works for LoadMw ~12000)
+        interval = calculate_interval(12000.0, method='fixed', percentage=0.01)
     """
     z_score = 1.64  # Z-score for 90% confidence interval (two-tailed)
     
@@ -82,31 +78,32 @@ def prepare_dataframe(df, time_col=None, price_col=None):
     """
     Prepare a DataFrame for time series prediction.
     
-    Automatically detects time and price columns, then prepares the DataFrame
-    with datetime index and 'close_price' column.
+    Automatically detects time and target columns. Supports both price data
+    (Close, close, PRICE) and energy demand (Total Load, LoadMw, load_mw).
+    Output uses 'load_mw' for energy data, 'close_price' for price data.
     
     Args:
         df: Raw DataFrame from CSV
         time_col: Name of time column (auto-detected if None)
-        price_col: Name of price column (auto-detected if None)
+        price_col: Name of target column (auto-detected if None)
     
     Returns:
-        DataFrame with datetime index and 'close_price' column
+        DataFrame with datetime index and 'load_mw' or 'close_price' column
     
     Example:
-        df = pd.read_csv('data.csv')
-        data = prepare_dataframe(df)
+        df = pd.read_csv('energydata.csv')
+        data = prepare_dataframe(df)  # Uses dt, Total Load
     """
     # Auto-detect time column
     if time_col is None:
-        for col in ['timestamp_utc', 'timestamp_local', 'time', 'date', df.columns[0]]:
+        for col in ['timestamp_utc', 'timestamp_local', 'time', 'date', 'dt', df.columns[0]]:
             if col in df.columns:
                 time_col = col
                 break
     
-    # Auto-detect price column
+    # Auto-detect target column: energy (LoadMw, Total Load) or price
     if price_col is None:
-        for col in ['Close', 'close', 'PRICE', 'price']:
+        for col in ['LoadMw', 'Total Load', 'load_mw', 'Close', 'close', 'PRICE', 'price']:
             if col in df.columns:
                 price_col = col
                 break
@@ -115,14 +112,17 @@ def prepare_dataframe(df, time_col=None, price_col=None):
             price_col = df.columns[1]
     
     if time_col is None or price_col is None:
-        raise ValueError(f"Could not detect time/price columns. Available: {df.columns.tolist()}")
+        raise ValueError(f"Could not detect time/target columns. Available: {df.columns.tolist()}")
     
-    # Prepare dataframe
+    df = df.copy()
     df[time_col] = pd.to_datetime(df[time_col])
     time_series_df = df[[time_col, price_col]].copy()
-    time_series_df.columns = ['datetime', 'close_price']
+    # Use load_mw for energy data, close_price for price data
+    target_name = 'load_mw' if price_col in ('LoadMw', 'Total Load', 'load_mw') else 'close_price'
+    time_series_df.columns = ['datetime', target_name]
     time_series_df = time_series_df.set_index('datetime')
     time_series_df = time_series_df.sort_index()
+    time_series_df = time_series_df.dropna()
     
     return time_series_df
 
@@ -136,7 +136,7 @@ def predict_1hour_ahead(model, data, timestamp, n_steps=12, interval_method='fix
     
     Args:
         model: Trained model (must have .predict() method)
-        data: DataFrame with datetime index and 'close_price' column
+        data: DataFrame with datetime index and 'close_price' or 'load_mw' column
         timestamp: ISO format timestamp string
         n_steps: Number of timesteps to use (default: 12 = 1 hour for 5-min data)
         interval_method: 'fixed' or 'std' for confidence interval calculation

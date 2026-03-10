@@ -14,7 +14,7 @@
 
 ## What is Bittbridge?
 
-Bittbridge is a Bittensor subnet for USDT/CNY price prediction. **Miners** serve predictions; **Validators** score them and set weights. The subnet rewards accurate predictions.
+Bittbridge is a Bittensor subnet for New England energy demand (LoadMw) prediction. **Miners** serve predictions; **Validators** score them and set weights. The subnet rewards accurate predictions.
 
 ### High-Level Flow
 
@@ -42,8 +42,10 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 ## Quick Start
 
 1. **You need:** GitHub account, GCP free trial, tTAO (testnet tokens)
-2. **Standard path:** Deploy on a GCP VM (recommended)
-3. **Follow the guide:** Step-by-step instructions below
+2. **ISO-NE API:** Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false), then add your username and password to `.env` (copy from `.env.example`).
+3. **Verify API:** Run `python test.py` to confirm API access before starting miner or validator.
+4. **Standard path:** Deploy on a GCP VM (recommended)
+5. **Follow the guide:** Step-by-step instructions below
 
 ---
 
@@ -72,7 +74,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 | | Two wallets created or imported (miner & validator); mnemonics stored |
 | | tTAO balance is positive |
 | | Miner and validator hotkeys registered to subnet 420 |
-| | CoinGecko + WandB API keys set (validator only) |
+| | ISO-NE credentials in `.env` (ISO_NE_USERNAME, ISO_NE_PASSWORD); WandB API key (validator only) |
 | | Miner running in one tmux session (`python -m neurons.miner`) |
 | | Validator running in another tmux session |
 | | Detached from tmux (`Ctrl+b` `d`) – both running 24/7 |

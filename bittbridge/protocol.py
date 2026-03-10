@@ -24,8 +24,8 @@ import pydantic
 
 class Challenge(bt.Synapse):
     """
-    Challenge Synapse: 
-    Used by validators to request a USDT/CNY price prediction for a given timestamp.
+    Challenge Synapse:
+    Used by validators to request a New England energy demand (LoadMw) prediction for a given timestamp.
     Miners respond with a point estimate and an optional prediction interval.
     """
     

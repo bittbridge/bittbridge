@@ -8,7 +8,7 @@ This is the main miner file that integrates your predictive model with the Bitte
 The miner handles network communication, while your model handles predictions.
 
 To use this miner:
-1. Place your .h5 model file and .csv data file in miner_model/ directory
+1. Place your .h5 model file and data (CSV or use ISO-NE API for LoadMw) in miner_model/ directory
 2. Run the miner - it will auto-discover your model and data files
 
 Example:
@@ -129,7 +129,7 @@ class Miner(BaseMinerNeuron):
         # ============================================================
         # This is where your model's predict() method is called.
         # Your model should return:
-        #   - prediction: float (the predicted USDT/CNY price)
+        #   - prediction: float (the predicted LoadMw in MW)
         #   - interval: [lower, upper] (90% confidence interval)
         #
         # If your model fails, it should return (None, None)

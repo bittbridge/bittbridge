@@ -17,7 +17,7 @@ class PredictionModel(ABC):
     Abstract base class for all prediction models in the Bittbridge subnet.
     
     All custom models must inherit from this class and implement the predict() method.
-    The model is responsible for generating USDT/CNY price predictions and confidence intervals.
+    The model is responsible for generating LoadMw (New England energy demand) predictions and confidence intervals.
     
     Example:
         class MyCustomModel(PredictionModel):
@@ -28,15 +28,15 @@ class PredictionModel(ABC):
             
             def predict(self, timestamp: str) -> Tuple[Optional[float], Optional[List[float]]]:
                 # Your prediction logic here
-                prediction = 7.25  # Your predicted price
-                interval = [7.10, 7.40]  # [lower_bound, upper_bound] for 90% confidence
+                prediction = 12000.0  # Your predicted LoadMw (MW)
+                interval = [11800.0, 12200.0]  # [lower_bound, upper_bound] for 90% confidence
                 return prediction, interval
     """
     
     @abstractmethod
     def predict(self, timestamp: str) -> Tuple[Optional[float], Optional[List[float]]]:
         """
-        Generate a USDT/CNY price prediction for the given timestamp.
+        Generate a LoadMw (New England energy demand) prediction for the given timestamp.
         
         This is the core method that validators will call. It should:
         1. Use the timestamp to determine what prediction to make
@@ -45,11 +45,11 @@ class PredictionModel(ABC):
         Args:
             timestamp: ISO format timestamp string (e.g., "2024-01-15T10:30:00+00:00")
                      This represents the time from which the prediction should be made.
-                     Typically, you'll predict the price 1 hour ahead from this timestamp.
+                     Typically, you'll predict the LoadMw 1 hour ahead from this timestamp.
         
         Returns:
             Tuple containing:
-            - prediction (Optional[float]): The predicted USDT/CNY price. 
+            - prediction (Optional[float]): The predicted LoadMw (MW).
               Return None if prediction cannot be made (e.g., API failure, insufficient data).
             - interval (Optional[List[float]]): A list [lower_bound, upper_bound] representing
               the 90% confidence interval for the prediction.
@@ -59,13 +59,13 @@ class PredictionModel(ABC):
             - Both prediction and interval can be None if the model fails
             - The validator will ignore responses with None predictions (miner gets zero reward)
             - The interval should represent a 90% confidence interval: [lower, upper]
-            - Make sure your predictions are reasonable (e.g., USDT/CNY is typically 6-8 range)
+            - LoadMw for New England is typically 10,000-15,000 MW
         
         Example:
             >>> model = MyCustomModel()
             >>> prediction, interval = model.predict("2024-01-15T10:30:00+00:00")
             >>> print(f"Prediction: {prediction}, Interval: {interval}")
-            Prediction: 7.25, Interval: [7.10, 7.40]
+            Prediction: 12000.0, Interval: [11800.0, 12200.0]
         """
         pass
     
