@@ -16,6 +16,7 @@
 
 import asyncio
 import time
+import traceback
 
 # Bittensor
 import bittensor as bt
@@ -198,16 +199,20 @@ class Validator(BaseValidatorNeuron):
 # Ensure that validator see new miners that have joined the network.
 async def metagraph_resync_scheduler(validator, resync_interval=60):
     while True:
-        validator.resync_metagraph()
-
-        # refresh cached hotkeys after every resync (for W&B context)
-        # This block ensures our hotkeys dict is always in sync with the latest metagraph.
         try:
-            validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
-        except Exception:
-            pass
-
-        bt.logging.info("Metagraph resynced.")
+            if validator.resync_metagraph():
+                # refresh cached hotkeys after every resync (for W&B context)
+                # This block ensures our hotkeys dict is always in sync with the latest metagraph.
+                try:
+                    validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
+                except Exception:
+                    pass
+                bt.logging.info("Metagraph resynced.")
+        except Exception as e:
+            bt.logging.error(
+                f"Metagraph resync scheduler error (will retry next interval): {type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            )
         await asyncio.sleep(resync_interval)
 
 

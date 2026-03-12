@@ -287,19 +287,49 @@ class BaseValidatorNeuron(BaseNeuron):
         else:
             bt.logging.error("set_weights failed", msg)
 
-    def resync_metagraph(self):
-        """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
+    def _safe_metagraph_sync(self, max_retries: int = 3, base_delay: float = 1.0) -> bool:
+        """
+        Syncs the metagraph with bounded retries and exponential backoff.
+        Protects against transient WebSocket/RPC issues (e.g., HTTP 502).
+        Returns True if sync succeeded, False if all retries failed.
+        """
+        last_exc = None
+        for attempt in range(max_retries):
+            try:
+                self.metagraph.sync(subtensor=self.subtensor)
+                return True
+            except Exception as e:
+                last_exc = e
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    bt.logging.warning(
+                        f"Metagraph sync failed (attempt {attempt + 1}/{max_retries}): "
+                        f"{type(e).__name__}: {e}. Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    bt.logging.error(
+                        f"Metagraph sync failed after {max_retries} attempts: "
+                        f"{type(last_exc).__name__}: {last_exc}"
+                    )
+                    return False
+
+    def resync_metagraph(self) -> bool:
+        """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
+        Returns True if sync succeeded, False otherwise."""
         bt.logging.info("resync_metagraph()")
 
         # Copies state of metagraph before syncing.
         previous_metagraph = copy.deepcopy(self.metagraph)
 
-        # Sync the metagraph.
-        self.metagraph.sync(subtensor=self.subtensor)
+        # Sync the metagraph with retries; skip state updates if sync fails.
+        if not self._safe_metagraph_sync():
+            bt.logging.warning("Skipping metagraph state update this cycle due to sync failure.")
+            return False
 
         # Check if the metagraph axon info has changed.
         if previous_metagraph.axons == self.metagraph.axons:
-            return
+            return True
 
         bt.logging.info(
             "Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages"
@@ -320,6 +350,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Update the hotkeys.
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
+        return True
 
     def update_scores(self, rewards: np.ndarray, uids: List[int]):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
