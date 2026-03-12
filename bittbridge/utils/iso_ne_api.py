@@ -7,8 +7,10 @@ using HTTP Basic Auth. Credentials from .env: ISO_NE_USERNAME, ISO_NE_PASSWORD.
 
 import os
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
+
+from bittbridge.utils.timestamp import get_now
 
 import requests
 from pytz import timezone
@@ -162,7 +164,13 @@ def get_load_mw_for_timestamp(timestamp: str) -> Optional[float]:
         dt_rounded = round_to_interval(dt, interval_minutes=5)
         # dt_rounded is already in Eastern (timestamp module uses Eastern); API day is Eastern
         day_yyyymmdd = dt_rounded.strftime("%Y%m%d")
-        data = fetch_fiveminute_system_load(day_yyyymmdd, use_cache=True)
+        # For recent slots (within last 30 min), bypass cache so retries get fresh API data
+        now_eastern = get_now()
+        if dt_rounded.tzinfo is None:
+            dt_rounded = dt_rounded.replace(tzinfo=EASTERN)
+        is_recent = (now_eastern - dt_rounded) <= timedelta(minutes=30)
+        use_cache = not is_recent
+        data = fetch_fiveminute_system_load(day_yyyymmdd, use_cache=use_cache)
         dt_rounded = dt_rounded.replace(second=0, microsecond=0)
         for slot_dt, load_mw in data:
             slot_normalized = slot_dt.replace(second=0, microsecond=0)

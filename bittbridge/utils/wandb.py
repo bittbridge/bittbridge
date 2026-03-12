@@ -33,7 +33,8 @@ def setup_wandb(self) -> None:
     name_uid = uid if uid is not None else fallback
     run_name = f"validator-{name_uid}-{__version__}"
 
-    # Init W&B
+    # Init W&B — use resume="never" so a deleted run on the server doesn't cause
+    # init to hang/timeout; each validator start gets a fresh run.
     wandb.init(
         project=f"sn{self.config.netuid}-validators",
         entity=WANDB_ENTITY,
@@ -43,9 +44,10 @@ def setup_wandb(self) -> None:
             "subnet_version": __version__,
         },
         name=run_name,
-        resume="auto",
+        resume="never",
         dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
         reinit="default",
+        settings=wandb.Settings(init_timeout=120),
     )
 
 def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):

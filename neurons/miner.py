@@ -120,9 +120,15 @@ class Miner(BaseMinerNeuron):
 
         # Step 6: Log successful prediction
         if self._add_test_noise:
-            bt.logging.success(f"Predicted LoadMw: {prediction:.1f}, Interval: {synapse.interval} (with noise)")
+            bt.logging.success(
+                f"Predicting LoadMw for timestamp={synapse.timestamp}: "
+                f"{prediction:.1f}, Interval: {synapse.interval} (with noise)"
+            )
         else:
-            bt.logging.success(f"Predicted LoadMw: {prediction:.1f}, Interval: {synapse.interval}")
+            bt.logging.success(
+                f"Predicting LoadMw for timestamp={synapse.timestamp}: "
+                f"{prediction:.1f}, Interval: {synapse.interval}"
+            )
         return synapse
 
     async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:

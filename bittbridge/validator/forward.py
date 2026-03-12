@@ -45,6 +45,7 @@ async def forward(self):
 
     # Step 3: Build challenge synapse
     challenge = Challenge(timestamp=timestamp)
+    bt.logging.info(f"[VALIDATOR] Requesting prediction for timestamp={timestamp}")
 
     # Step 4: Query miners
     responses = await self.dendrite(
@@ -69,7 +70,10 @@ async def forward(self):
                 "request_time": now
             })
             valid_responses_count += 1
-            bt.logging.info(f"[COLLECT] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+            bt.logging.info(
+                f"[COLLECT] timestamp={timestamp}, UID={miner_uids[i]}, "
+                f"Prediction={response.prediction}, Interval={response.interval}"
+            )
         else:
             bt.logging.warning(f"[NO_SUBMISSION] UID={miner_uids[i]} provided no prediction - will receive zero reward")
     

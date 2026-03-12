@@ -101,6 +101,9 @@ class Validator(BaseValidatorNeuron):
                         timestamp_groups[timestamp] = []
                     timestamp_groups[timestamp].append(pred)
                 
+                # Track predictions that were actually evaluated (so we only remove those)
+                processed_preds = []
+                
                 # Process each timestamp group
                 for timestamp, predictions in timestamp_groups.items():
                     actual = get_actual_load_mw(timestamp)
@@ -162,9 +165,14 @@ class Validator(BaseValidatorNeuron):
                                 f"Actual LoadMw={actual}, "
                                 f"Reward={rewards[i]:.4f}"
                             )
+                        processed_preds.extend(predictions)
+                    else:
+                        bt.logging.info(
+                            f"Actual load not yet available for timestamp={timestamp} - will retry"
+                        )
                 
-                # Remove processed predictions
-                for pred in ready:
+                # Remove only predictions that were actually evaluated
+                for pred in processed_preds:
                     self.prediction_queue.remove(pred)
             
             # Log to W&B if we have data and W&B is available
