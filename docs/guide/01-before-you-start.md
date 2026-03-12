@@ -25,16 +25,6 @@ Understanding these will help you follow the setup:
 
 ---
 
-## Package Versioning (TensorFlow)
-
-**Be conscious of TensorFlow and other package versions.** The version on your VM must match the version used when you trained your model.
-
-- TensorFlow is specified in `miner_model/requirements.txt` (e.g., `tensorflow>=2.13.0`).
-- If you train your model locally with a different TensorFlow version, the miner may fail to load the model on the VM.
-- Ensure the VM environment and your training environment use compatible versions.
-
----
-
 ## Prerequisites
 
 - **Google Cloud Platform:** Activated free trial
