@@ -99,7 +99,29 @@ Optional checks (use wallet/coldkey name, not hotkey name):
 
 - Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false).
 - Copy `.env.example` to `.env` and add your username and password (`ISO_NE_USERNAME`, `ISO_NE_PASSWORD`).
-- Run `python test.py` to verify API access.
+Here's a guide how to do it:
+1) enter ```bash nano .env.example```
+  <img width="806" height="602" alt="Screenshot 2026-03-12 at 12 51 14 PM" src="https://github.com/user-attachments/assets/4ef49a49-c893-4233-a4df-1773222542ec" />
+2) enter your username and password you created on ISO-ne
+
+<img width="813" height="616" alt="Screenshot 2026-03-12 at 12 50 29 PM" src="https://github.com/user-attachments/assets/884f8718-8b73-49d6-bb82-4439bf76227f" />
+
+3) Press CTRL+x
+
+<img width="801" height="70" alt="Screenshot 2026-03-12 at 12 50 40 PM" src="https://github.com/user-attachments/assets/be331c96-7182-4081-8fe4-200b46c91c34" />
+
+4) Enter Y
+<img width="807" height="83" alt="Screenshot 2026-03-12 at 12 50 52 PM" src="https://github.com/user-attachments/assets/c336f207-1007-40fa-b4ae-04d2f071e09b" />
+
+5) Change name to .env 
+
+<img width="811" height="83" alt="Screenshot 2026-03-12 at 12 50 58 PM" src="https://github.com/user-attachments/assets/51efc8f9-2a59-4b60-8089-f59cad4b72c7" />
+<img width="809" height="86" alt="Screenshot 2026-03-12 at 12 51 03 PM" src="https://github.com/user-attachments/assets/ad510bc1-24e6-4f7b-a207-9fbbda2ec0f3" />
+
+6) Press Y to save file with .end name
+
+<img width="806" height="75" alt="Screenshot 2026-03-12 at 12 51 09 PM" src="https://github.com/user-attachments/assets/53670e69-8ba9-4f50-a8c5-d06a120fbdb5" />
+
 
 ### WandB (Validators)
 
