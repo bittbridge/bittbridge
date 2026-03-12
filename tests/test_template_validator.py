@@ -20,13 +20,12 @@ import sys
 import unittest
 
 import bittensor as bt
-import torch
 
 from neurons.validator import Validator
 from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.protocol import Challenge
 from bittbridge.utils.uids import get_random_uids
-from bittbridge.validator.reward import get_rewards
+from bittbridge.validator.reward import get_incentive_mechanism_rewards
 
 
 class TemplateValidatorNeuronTestCase(unittest.TestCase):
@@ -61,52 +60,40 @@ class TemplateValidatorNeuronTestCase(unittest.TestCase):
 
     def test_dummy_responses(self):
         # TODO: Test that the dummy responses are correctly constructed
-
+        # Challenge now requires timestamp; use a sample ISO timestamp
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
         responses = self.neuron.dendrite.query(
-            # Send the query to miners in the network.
             axons=[
                 self.neuron.metagraph.axons[uid] for uid in self.miner_uids
             ],
-            # Construct a dummy query.
-            synapse=Challenge(dummy_input=self.neuron.step),
-            # All responses have the deserialize function called on them before returning.
+            synapse=Challenge(timestamp=ts),
             deserialize=True,
         )
-
-        for i, response in enumerate(responses):
-            self.assertEqual(response, self.neuron.step * 2)
+        # Responses are predictions (float or None); basic sanity check
+        for response in responses:
+            self.assertIsInstance(response, (float, type(None)))
 
     def test_reward(self):
-        # TODO: Test that the reward function returns the correct value
-        responses = self.dendrite.query(
-            # Send the query to miners in the network.
-            axons=[self.metagraph.axons[uid] for uid in self.miner_uids],
-            # Construct a dummy query.
-            synapse=Challenge(dummy_input=self.neuron.step),
-            # All responses have the deserialize function called on them before returning.
-            deserialize=True,
-        )
-
-        rewards = get_rewards(self.neuron, responses)
-        expected_rewards = torch.FloatTensor([1.0] * len(responses))
-        self.assertEqual(rewards, expected_rewards)
+        # Test incentive mechanism with mocked LoadMw (actual_load_mw=12000)
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        responses = [
+            Challenge(timestamp=ts),
+            Challenge(timestamp=ts),
+        ]
+        responses[0].prediction = 11900.0
+        responses[0].interval = [11800.0, 12000.0]
+        responses[1].prediction = 12100.0
+        responses[1].interval = [12000.0, 12200.0]
+        actual_load_mw = 12000.0  # Mock ground truth
+        rewards, _ = get_incentive_mechanism_rewards(actual_load_mw, responses)
+        self.assertEqual(len(rewards), 2)
+        self.assertTrue(all(r >= 0 for r in rewards))
 
     def test_reward_with_nan(self):
-        # TODO: Test that NaN rewards are correctly sanitized
-        # TODO: Test that a bt.logging.warning is thrown when a NaN reward is sanitized
-        responses = self.dendrite.query(
-            # Send the query to miners in the network.
-            axons=[self.metagraph.axons[uid] for uid in self.miner_uids],
-            # Construct a dummy query.
-            synapse=Challenge(dummy_input=self.neuron.step),
-            # All responses have the deserialize function called on them before returning.
-            deserialize=True,
-        )
-
-        rewards = get_rewards(self.neuron, responses)
-        expected_rewards = rewards.clone()
-        # Add NaN values to rewards
-        rewards[0] = float("nan")
-
-        with self.assertLogs(bt.logging, level="WARNING") as cm:
-            self.neuron.update_scores(rewards, self.miner_uids)
+        # Test that NaN rewards are correctly sanitized
+        import numpy as np
+        rewards = np.array([0.5, float("nan"), 0.3])
+        with self.assertLogs(bt.logging, level="WARNING"):
+            self.neuron.update_scores(rewards, self.miner_uids[:3])

@@ -19,10 +19,10 @@
 
 import time
 import asyncio
-from datetime import datetime, timezone
 import bittensor as bt
 from bittbridge.protocol import Challenge
 from bittbridge.utils.uids import get_random_uids
+from bittbridge.utils.timestamp import get_next_interval, to_str
 
 
 async def forward(self):
@@ -35,8 +35,9 @@ async def forward(self):
     4. Query miners
     5. Store responses and timestamp
     """
-    # Step 1: Generate timestamp
-    timestamp = datetime.now(timezone.utc).isoformat()
+    # Step 1: Generate timestamp for the *next* 5-min slot (Eastern).
+    # At 10:00 we ask "what will demand be at 10:05?"; after 10:05 we evaluate with actual 10:05.
+    timestamp = to_str(get_next_interval(interval_minutes=5))
 
     # Step 2: Select miners (k comes from self.config.neuron.sample_size)
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
@@ -44,6 +45,7 @@ async def forward(self):
 
     # Step 3: Build challenge synapse
     challenge = Challenge(timestamp=timestamp)
+    bt.logging.info(f"[VALIDATOR] Requesting prediction for timestamp={timestamp}")
 
     # Step 4: Query miners
     responses = await self.dendrite(
@@ -68,7 +70,10 @@ async def forward(self):
                 "request_time": now
             })
             valid_responses_count += 1
-            bt.logging.info(f"[COLLECT] UID={miner_uids[i]}, Prediction={response.prediction}, Interval={response.interval}")
+            bt.logging.info(
+                f"[COLLECT] timestamp={timestamp}, UID={miner_uids[i]}, "
+                f"Prediction={response.prediction}, Interval={response.interval}"
+            )
         else:
             bt.logging.warning(f"[NO_SUBMISSION] UID={miner_uids[i]} provided no prediction - will receive zero reward")
     

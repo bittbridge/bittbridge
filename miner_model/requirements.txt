@@ -1,0 +1,13 @@
+# Additional requirements for miner models
+# Note: Core dependencies (bittensor, bittbridge) should be installed
+# from the main project requirements.txt
+
+# For API-based models (if your model uses external APIs)
+requests>=2.31.0
+
+# Optional: For advanced ML models
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+tensorflow>=2.13.0  # If using TensorFlow models
+

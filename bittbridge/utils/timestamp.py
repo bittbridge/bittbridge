@@ -10,9 +10,10 @@ from pytz import timezone
 
 def get_timezone() -> timezone:
     """
-    Set the Global shared timezone for all timestamp manipulation
+    Global timezone for all timestamp manipulation.
+    Eastern (America/New_York) to align with ISO-NE API and New England demand.
     """
-    return timezone("UTC")
+    return timezone("America/New_York")
 
 
 def get_now() -> datetime:
@@ -74,53 +75,41 @@ def to_posix(timestamp: Union[datetime, str, float]) -> float:
     Convert datetime to seconds that have elapsed since Jan 1 1970
     """
 
-    # Verify datetime object and convert to UTC
-    utc_datetime = to_datetime(timestamp)
-
-    # Convert to posix time float
-    posix_timestamp = utc_datetime.timestamp()
+    dt = to_datetime(timestamp)
+    posix_timestamp = dt.timestamp()
 
     return float(posix_timestamp)
 
 
 def to_str(timestamp: Union[datetime, str, float]) -> str:
     """
-    Convert datetime to iso 8601 string
+    Convert datetime to ISO 8601 string (with timezone offset).
     """
-
-    # Verify datetime object and convert to UTC
-    utc_datetime = to_datetime(timestamp)
-
-    # Convert to iso8601 string
-    str_datetime = utc_datetime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-    return str(str_datetime)
+    dt = to_datetime(timestamp)
+    return dt.isoformat()
 
 
 def to_datetime(timestamp: Union[str, float]) -> datetime:
     """
-    Convert iso 8601 string, or a POSIX time float, to datetime
+    Convert ISO 8601 string (with Z or offset) or POSIX float to datetime in global timezone (Eastern).
     """
     if isinstance(timestamp, str):
-        # Assume the proper iso 8601 string format is used
-        # `strptime` will trigger an error as needed
-        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=get_timezone())
+        # Accept both "Z" and offset formats (e.g. -04:00)
+        ts = timestamp.strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone("UTC"))
+        return dt.astimezone(get_timezone())
 
-    elif isinstance(timestamp, float):
-        # Assume proper float value
-        # `fromtimestamp` will trigger errors as needed
+    if isinstance(timestamp, float):
         return datetime.fromtimestamp(timestamp, tz=get_timezone())
 
-    elif isinstance(timestamp, datetime):
-        # Already a datetime object
-        # Return as UTC
+    if isinstance(timestamp, datetime):
         return timestamp.astimezone(get_timezone())
 
-    else:
-        # Invalid typing
-        raise TypeError(
-            "Must pass a timestamp that is either a iso 8601 string, POSIX time float, or a datetime object"
-        )
+    raise TypeError(
+        "Must pass a timestamp that is either a iso 8601 string, POSIX time float, or a datetime object"
+    )
 
 
 ###############################
@@ -140,15 +129,24 @@ def round_minute_down(timestamp: datetime, base: int = 5) -> datetime:
     Round the timestamp down to the nearest 5 minutes
 
     Example:
-        >>> timestamp = datetime.now(timezone("UTC"))
-        >>> timestamp
-        datetime.datetime(2024, 11, 14, 18, 18, 16, 719482, tzinfo=<UTC>)
+        >>> timestamp = datetime.now(timezone("America/New_York"))
         >>> round_minute_down(timestamp)
-        datetime.datetime(2024, 11, 14, 18, 15, tzinfo=<UTC>)
+        datetime with minute rounded down to multiple of base
     """
     # Round the minute down to the nearest multiple of `base`
     correct_minute: int = timestamp.minute // base * base
     return timestamp.replace(minute=correct_minute, second=0, microsecond=0)
+
+
+def get_next_interval(interval_minutes: int = 5) -> datetime:
+    """
+    Get the start of the next 5-minute slot (Eastern).
+    Use when the validator asks "what will demand be in the NEXT 5-min slot?".
+    E.g. at 10:00:00 returns 10:05:00; at 10:04:59 returns 10:05:00; at 10:05:00 returns 10:10:00.
+    """
+    now = get_now()
+    rounded_down = round_minute_down(now, base=interval_minutes)
+    return rounded_down + timedelta(minutes=interval_minutes)
 
 
 def round_to_interval(timestamp: datetime, interval_minutes: int = 5) -> datetime:
@@ -163,29 +161,22 @@ def round_to_interval(timestamp: datetime, interval_minutes: int = 5) -> datetim
         datetime: A new timestamp rounded to the nearest interval
 
     Example:
-        >>> dt = datetime(2024, 1, 1, 14, 13, 30, tzinfo=timezone('UTC'))
-        >>> round_to_interval(dt, 5)
-        datetime.datetime(2024, 1, 1, 14, 15, tzinfo=<UTC>)  # Rounds up to 14:15
-        >>> round_to_interval(dt, 15)
-        datetime.datetime(2024, 1, 1, 14, 15, tzinfo=<UTC>)  # Rounds up to 14:15
-        >>> dt = datetime(2024, 1, 1, 14, 16, 30, tzinfo=timezone('UTC'))
-        >>> round_to_interval(dt, 15)
-        datetime.datetime(2024, 1, 1, 14, 15, tzinfo=<UTC>)  # Rounds down to 14:15
+        >>> dt in Eastern; round_to_interval(dt, 5)  # Rounds to nearest 5 min in Eastern
     """
     if not isinstance(timestamp, datetime):
         timestamp = to_datetime(timestamp)
 
-    # Ensure timestamp is in UTC
-    utc_timestamp = timestamp.astimezone(get_timezone())
+    # Work in global timezone (Eastern)
+    local_timestamp = timestamp.astimezone(get_timezone())
 
-    # Calculate total minutes since midnight
-    minutes_since_midnight = utc_timestamp.hour * 60 + utc_timestamp.minute
+    # Calculate total minutes since midnight (Eastern)
+    minutes_since_midnight = local_timestamp.hour * 60 + local_timestamp.minute
 
     # Calculate the nearest interval
     rounded_minutes = round(minutes_since_midnight / interval_minutes) * interval_minutes
 
     # Create new timestamp with rounded minutes
-    new_timestamp = utc_timestamp.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+    new_timestamp = local_timestamp.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
         minutes=rounded_minutes
     )
 

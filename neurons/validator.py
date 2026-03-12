@@ -16,6 +16,7 @@
 
 import asyncio
 import time
+import traceback
 
 # Bittensor
 import bittensor as bt
@@ -27,7 +28,7 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_usdt_cny, reward, get_incentive_mechanism_rewards
+from bittbridge.validator.reward import get_actual_load_mw, reward, get_incentive_mechanism_rewards
 
 # Protocol imports
 from bittbridge.protocol import Challenge
@@ -82,7 +83,7 @@ class Validator(BaseValidatorNeuron):
         return await forward(self)
     # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
     # evaluation_delay: the delay in seconds after which the predictions are processed
-    async def evaluation_loop(self, evaluation_delay=3600, check_interval=10):
+    async def evaluation_loop(self, evaluation_delay=600, check_interval=10):
         while True:
             now = time.time()
             ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
@@ -101,9 +102,12 @@ class Validator(BaseValidatorNeuron):
                         timestamp_groups[timestamp] = []
                     timestamp_groups[timestamp].append(pred)
                 
+                # Track predictions that were actually evaluated (so we only remove those)
+                processed_preds = []
+                
                 # Process each timestamp group
                 for timestamp, predictions in timestamp_groups.items():
-                    actual = get_actual_usdt_cny()
+                    actual = get_actual_load_mw(timestamp)
                     if actual is not None:
                         # Convert predictions to Challenge objects for incentive mechanism scoring
                         responses = []
@@ -118,7 +122,7 @@ class Validator(BaseValidatorNeuron):
                         
                         # Use incentive mechanism for scoring
                         rewards, updated_weights = get_incentive_mechanism_rewards(
-                            actual_price=actual,
+                            actual_load_mw=actual,
                             responses=responses,
                             previous_weights=self.previous_weights,
                             alpha=self.alpha
@@ -159,12 +163,17 @@ class Validator(BaseValidatorNeuron):
                                 f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
                                 f"Interval={pred.get('interval')}, "
-                                f"Actual={actual}, "
+                                f"Actual LoadMw={actual}, "
                                 f"Reward={rewards[i]:.4f}"
                             )
+                        processed_preds.extend(predictions)
+                    else:
+                        bt.logging.info(
+                            f"Actual load not yet available for timestamp={timestamp} - will retry"
+                        )
                 
-                # Remove processed predictions
-                for pred in ready:
+                # Remove only predictions that were actually evaluated
+                for pred in processed_preds:
                     self.prediction_queue.remove(pred)
             
             # Log to W&B if we have data and W&B is available
@@ -188,24 +197,28 @@ class Validator(BaseValidatorNeuron):
 
 # Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph.
 # Ensure that validator see new miners that have joined the network.
-async def metagraph_resync_scheduler(validator, resync_interval=600):
+async def metagraph_resync_scheduler(validator, resync_interval=60):
     while True:
-        validator.resync_metagraph()
-
-        # refresh cached hotkeys after every resync (for W&B context)
-        # This block ensures our hotkeys dict is always in sync with the latest metagraph.
         try:
-            validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
-        except Exception:
-            pass
-
-        bt.logging.info("Metagraph resynced.")
+            if validator.resync_metagraph():
+                # refresh cached hotkeys after every resync (for W&B context)
+                # This block ensures our hotkeys dict is always in sync with the latest metagraph.
+                try:
+                    validator.hotkeys = {uid: hk for uid, hk in enumerate(validator.metagraph.hotkeys)}
+                except Exception:
+                    pass
+                bt.logging.info("Metagraph resynced.")
+        except Exception as e:
+            bt.logging.error(
+                f"Metagraph resync scheduler error (will retry next interval): {type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            )
         await asyncio.sleep(resync_interval)
 
 
 async def prediction_scheduler(validator):
     # Set your prediction interval (in minutes)
-    prediction_interval = 5  # Query miners every 5 minutes
+    prediction_interval = 5  # Query miners every 5 minute
     # Initialize timestamp to current time, rounded to interval
     timestamp = to_str(round_to_interval(get_now(), interval_minutes=prediction_interval))
     while True:
@@ -220,11 +233,13 @@ async def prediction_scheduler(validator):
 
 async def main():
     validator = Validator()
-    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=3600, check_interval=10))
+    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=600, check_interval=10))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
-    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=600))
+    resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=60))
     await asyncio.gather(eval_task, pred_task, resync_task)
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     asyncio.run(main())
