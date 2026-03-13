@@ -30,7 +30,7 @@ source venv/bin/activate
 export WANDB_API_KEY="PASTE_YOUR_WANDB_API_KEY"
 
 python3 -m neurons.validator \
-  --netuid 420 \
+  --netuid 183 \
   --subtensor.network test \
   --wallet.name YOUR_VALIDATOR_NAME \
   --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \

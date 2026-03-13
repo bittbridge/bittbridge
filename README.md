@@ -27,7 +27,7 @@ flowchart LR
         M1[Miner]
     end
     subgraph chain [Bittensor Chain]
-        S[Subnet 420]
+        S[Subnet 183]
     end
     V1 -->|"Challenge"| M1
     M1 -->|"Prediction"| V1
@@ -73,7 +73,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 | | Repo cloned on VM, venv activated |
 | | Two wallets created or imported (miner & validator); mnemonics stored |
 | | tTAO balance is positive |
-| | Miner and validator hotkeys registered to subnet 420 |
+| | Miner and validator hotkeys registered to subnet 183 |
 | | ISO-NE credentials in `.env` (ISO_NE_USERNAME, ISO_NE_PASSWORD); WandB API key (validator only) |
 | | Miner running in one tmux session (`python -m neurons.miner`) |
 | | Validator running in another tmux session |

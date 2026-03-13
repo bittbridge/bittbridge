@@ -47,7 +47,7 @@ From the repo root (`bittbridge/`) with venv activated:
 
 ```bash
 python -m miner_model.miner_plugin \
-  --netuid 420 \
+  --netuid 183 \
   --subtensor.network test \
   --wallet.name YOUR_MINER_NAME \
   --wallet.hotkey YOUR_HOTKEY_NAME

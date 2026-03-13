@@ -34,7 +34,7 @@ You can make changes in moving average period updating N_STEPS variable in neuro
 
 ```bash
 python -m neurons.miner \
-  --netuid 420 \
+  --netuid 183 \
   --subtensor.network test \
   --wallet.name miner \
   --wallet.hotkey default \
@@ -49,7 +49,7 @@ Use the **hotkey name** (e.g., `default`), not the ss58 address.
 
 ```bash
 python -m neurons.miner \
-  --netuid 420 \
+  --netuid 183 \
   --subtensor.network test \
   --wallet.name miner \
   --wallet.hotkey default \
@@ -67,7 +67,7 @@ If you need the custom model path for future use:
 
 ```bash
 python -m miner_model.miner_plugin \
-  --netuid 420 \
+  --netuid 183 \
   --subtensor.network test \
   --wallet.name miner \
   --wallet.hotkey default \

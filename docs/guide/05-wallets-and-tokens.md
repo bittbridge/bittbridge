@@ -84,9 +84,9 @@ btcli w balance --network test
 ## Register Validator & Miner Hotkeys
 
 ```bash
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name miner --wallet.hotkey default
+btcli subnet register --netuid 183 --subtensor.network test --wallet.name miner --wallet.hotkey default
 
-btcli subnet register --netuid 420 --subtensor.network test --wallet.name validator --wallet.hotkey default
+btcli subnet register --netuid 183 --subtensor.network test --wallet.name validator --wallet.hotkey default
 ```
 
 Optional checks (use wallet/coldkey name, not hotkey name):

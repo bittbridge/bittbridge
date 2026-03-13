@@ -5,7 +5,7 @@ This package provides a plugin system for integrating predictive models with the
 
 Quick Start:
     1. Place your .h5 model file and .csv data file in miner_model/ directory
-    2. Run: python -m miner_model.miner_plugin --netuid 420 --subtensor.network test ...
+    2. Run: python -m miner_model.miner_plugin --netuid 183 --subtensor.network test ...
     
 The my_model.py file will automatically discover and load your files.
 """
