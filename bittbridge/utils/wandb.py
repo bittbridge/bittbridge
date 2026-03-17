@@ -4,7 +4,7 @@ import wandb
 from bittbridge import __version__
 
 #WANDB_ENTITY = "bittbridge_uconn"
-# TODO: change to actual entity if needed
+# TODO: change to actual entity
 WANDB_ENTITY = "dwtest"
 
 def setup_wandb(self) -> None:
@@ -44,11 +44,7 @@ def setup_wandb(self) -> None:
         },
         name=run_name,
         resume="never",
-        dir=getattr(
-            getattr(getattr(self, "config", None), "neuron", None),
-            "full_path",
-            None,
-        ),
+        dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
         reinit="default",
         settings=wandb.Settings(init_timeout=120),
     )
@@ -60,7 +56,7 @@ def log_wandb(
     miner_uids,
     hotkeys,
     moving_average_scores,
-    true_value=None,
+    actual_load_mw=None,
     timestamp=None,
 ):
     try:
@@ -97,7 +93,7 @@ def log_wandb(
 
         wandb_val_log = {
             "miners_info": miners_info,
-            "true_value": float(true_value) if true_value is not None else None,
+            "actual_load_mw": float(actual_load_mw) if actual_load_mw is not None else None,
             "timestamp": str(timestamp) if timestamp is not None else None,
         }
 
@@ -114,8 +110,8 @@ def log_wandb(
                 wandb_val_log[f"miner_{uid}_reward"] = float(rew)
 
             # Log error only if possible
-            if point_pred is not None and true_value is not None:
-                error = abs(point_pred - true_value)
+            if point_pred is not None and actual_load_mw is not None:
+                error = abs(point_pred - actual_load_mw)
                 wandb_val_log[f"miner_{uid}_error"] = float(error)
 
         # Debug logging
