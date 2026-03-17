@@ -4,7 +4,7 @@ import wandb
 from bittbridge import __version__
 
 #WANDB_ENTITY = "bittbridge_uconn"
-# TODO: change to actual entity
+# TODO: change to actual entity if needed
 WANDB_ENTITY = "dwtest"
 
 def setup_wandb(self) -> None:
@@ -25,10 +25,9 @@ def setup_wandb(self) -> None:
         except Exception:
             uid = None  # keep None if not found
 
-    # Build a stable, human-friendly name:
+    # Build a stable, human-friendly run name:
     #   - validator-<uid>-<version> when we know uid
     #   - otherwise validator-<last6_of_hotkey>-<version>
-    from bittbridge import __version__
     fallback = (hotkey[-6:] if isinstance(hotkey, str) and len(hotkey) >= 6 else "na")
     name_uid = uid if uid is not None else fallback
     run_name = f"validator-{name_uid}-{__version__}"
@@ -36,7 +35,7 @@ def setup_wandb(self) -> None:
     # Init W&B — use resume="never" so a deleted run on the server doesn't cause
     # init to hang/timeout; each validator start gets a fresh run.
     wandb.init(
-        project=f"sn{self.config.netuid}-validators",
+        project=f"sn{netuid}-validators",
         entity=WANDB_ENTITY,
         config={
             "hotkey": hotkey,
@@ -45,12 +44,25 @@ def setup_wandb(self) -> None:
         },
         name=run_name,
         resume="never",
-        dir=getattr(getattr(getattr(self, "config", None), "neuron", None), "full_path", None),
+        dir=getattr(
+            getattr(getattr(self, "config", None), "neuron", None),
+            "full_path",
+            None,
+        ),
         reinit="default",
         settings=wandb.Settings(init_timeout=120),
     )
 
-def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
+
+def log_wandb(
+    responses,
+    rewards,
+    miner_uids,
+    hotkeys,
+    moving_average_scores,
+    true_value=None,
+    timestamp=None,
+):
     try:
         # rewards may be list or numpy array; make it list
         if hasattr(rewards, "tolist"):
@@ -60,18 +72,19 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
             # supports dict {uid->val} or list/tuple indexed by uid
             try:
                 if isinstance(ma_scores, dict):
-                    return float(ma_scores[uid]) if uid in ma_scores else float('nan')
+                    return float(ma_scores[uid]) if uid in ma_scores else float("nan")
                 if isinstance(ma_scores, (list, tuple)):
-                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float('nan')
+                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float("nan")
             except Exception:
                 pass
-            return float('nan')
+            return float("nan")
 
         miners_info = {}
         for uid, resp, rew in zip(miner_uids, responses, rewards):
             point_pred = getattr(resp, "prediction", None)
-            interval   = getattr(resp, "interval", None)
-            miners_info[str(uid)] = {  # cast key to string for nicer W&B tables
+            interval = getattr(resp, "interval", None)
+
+            miners_info[str(uid)] = { # cast key to string for nicer W&B tables
                 "miner_hotkey": hotkeys.get(uid),
                 "miner_point_prediction": point_pred,
                 "miner_interval_prediction": interval,
@@ -82,14 +95,36 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
         if not miners_info:
             return
 
-        wandb_val_log = {"miners_info": miners_info}
+        wandb_val_log = {
+            "miners_info": miners_info,
+            "true_value": float(true_value) if true_value is not None else None,
+            "timestamp": str(timestamp) if timestamp is not None else None,
+        }
 
-        # Pre-log trace of the exact payload (fallback to debug if trace is absent)
+        # Flatten metrics for plotting
+        for uid, resp, rew in zip(miner_uids, responses, rewards):
+            point_pred = getattr(resp, "prediction", None)
+
+            # Always log prediction if available
+            if point_pred is not None:
+                wandb_val_log[f"miner_{uid}_prediction"] = float(point_pred)
+
+            # Always log reward if available
+            if rew is not None:
+                wandb_val_log[f"miner_{uid}_reward"] = float(rew)
+
+            # Log error only if possible
+            if point_pred is not None and true_value is not None:
+                error = abs(point_pred - true_value)
+                wandb_val_log[f"miner_{uid}_error"] = float(error)
+
+        # Debug logging
         if hasattr(bt.logging, "trace"):
             bt.logging.trace(f"Attempting to log data to wandb: {wandb_val_log}")
         else:
             bt.logging.debug(f"Attempting to log data to wandb: {wandb_val_log}")
 
+        # Send to W&B
         wandb.log(wandb_val_log)
 
     except Exception as e:
