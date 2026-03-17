@@ -53,6 +53,7 @@ Example prediction round:
 |Good Miner|10340|10353.585|
 |Medium Miner|10150|10353.585|
 |Bad Miner|9500|10353.585|
+
 # **Error Calculation**
 Forecast accuracy is measured using **absolute percentage error**:
 $error_i = \frac{|prediction_i - actual|}{|actual|}$
@@ -71,6 +72,7 @@ Example calculation:
 | Good Miner   | 10340          | 10353.585  | 13.585             | 0.001312 (0.131%)    |
 | Medium Miner | 10150          | 10353.585  | 203.585            | 0.019663 (1.966%)    |
 | Bad Miner    | 9500           | 10353.585  | 853.585            | 0.082443 (8.244%)    |
+
 Smaller errors indicate more accurate forecasts.
 
 # **Converting Error into Score**
@@ -93,6 +95,7 @@ Example scoring using T = 0.097634:
 |Good Miner|10340|10353.585|0.001312|0.986651|
 |Medium Miner|10150|10353.585|0.019663|0.817587|
 |Bad Miner|9500|10353.585|0.082443|0.429810|
+
 
 Because the scoring function is continuous, **every improvement in forecast accuracy increases the score**.
 
@@ -117,6 +120,8 @@ The distribution of baseline errors was:
 | 50%            | **9.76%**            |
 | 75%            | 15.78%               |
 | 90%            | 21.41%               |
+
+
 The **median error** of the baseline model was:
 
 T = 0.097634 or approximately **9.76%**.
@@ -142,6 +147,8 @@ Example reward distribution:
 | Good Miner   | 10340          | 10353.585  | 0.001312  | 0.986651  | 0.441643   |
 | Medium Miner | 10150          | 10353.585  | 0.019663  | 0.817587  | 0.365967   |
 | Bad Miner    | 9500           | 10353.585  | 0.082443  | 0.429810  | 0.192390   |
+
+
 More accurate predictions therefore receive proportionally larger rewards.
 
 # **Key Properties of the Mechanism**
