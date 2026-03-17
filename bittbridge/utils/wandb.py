@@ -94,7 +94,7 @@ def log_wandb(
         wandb_val_log = {
             "miners_info": miners_info,
             "actual_load_mw": float(actual_load_mw) if actual_load_mw is not None else None,
-            "timestamp": str(timestamp) if timestamp is not None else None,
+            "timestamp": timestamp if timestamp is not None else None,
         }
 
         # Flatten metrics for plotting
