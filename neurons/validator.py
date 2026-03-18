@@ -92,6 +92,8 @@ class Validator(BaseValidatorNeuron):
             wb_responses = []
             wb_rewards = []
             wb_uids = []
+            # wb_actuals = []
+            # wb_timestamps = []
             
             if ready:
                 # Group predictions by timestamp for batch evaluation
@@ -157,6 +159,8 @@ class Validator(BaseValidatorNeuron):
                             wb_responses.append(responses[i])
                             wb_rewards.append(rewards[i])
                             wb_uids.append(pred["miner_uid"])
+                            # wb_actuals.append(actual)
+                            # wb_timestamps.append(timestamp)
                             
                             # Log detailed results
                             bt.logging.info(
@@ -188,6 +192,10 @@ class Validator(BaseValidatorNeuron):
                         miner_uids=wb_uids,
                         hotkeys=getattr(self, "hotkeys", {}),
                         moving_average_scores=moving_avgs,
+                        actual_load_mw=actual,
+                        timestamp=timestamp,
+                        # actual_load_mw=wb_actuals,
+                        # timestamp=wb_timestamps,
                     )
                 except Exception as e:
                     bt.logging.error(f"W&B log failed: {e}")
