@@ -54,7 +54,7 @@ async def forward(self):
         deserialize=False
     )
     
-    # Step 5: Store predictions in queue (including intervals for incentive mechanism)
+    # Step 5: Store predictions in queue for delayed evaluation
     # Only store responses from miners who actually submitted valid predictions
     now = time.time()
     valid_responses_count = 0
@@ -66,13 +66,12 @@ async def forward(self):
                 "timestamp": timestamp,
                 "miner_uid": miner_uids[i],
                 "prediction": response.prediction,
-                "interval": response.interval,
                 "request_time": now
             })
             valid_responses_count += 1
             bt.logging.info(
                 f"[COLLECT] timestamp={timestamp}, UID={miner_uids[i]}, "
-                f"Prediction={response.prediction}, Interval={response.interval}"
+                f"Prediction={response.prediction}"
             )
         else:
             bt.logging.warning(f"[NO_SUBMISSION] UID={miner_uids[i]} provided no prediction - will receive zero reward")

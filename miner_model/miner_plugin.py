@@ -107,17 +107,16 @@ class Miner(BaseMinerNeuron):
         This method:
         1. Extracts the timestamp from the synapse
         2. Calls your model's predict() method
-        3. Attaches the prediction and interval to the synapse
+        3. Attaches the point prediction to the synapse
         4. Returns the synapse to the validator
-        
-        Don't need to modify this method - it delegates to your model.
-        The validator will score your predictions based on insentive mechanism.
-        
+
+        The validator scores point forecasts per docs/guide/10-incentive mechanism.md.
+
         Args:
             synapse: Challenge synapse containing the timestamp to predict from
-        
+
         Returns:
-            Challenge synapse with prediction and interval filled in
+            Challenge synapse with prediction filled in
         """
         # Extract timestamp from the challenge
         timestamp = synapse.timestamp
@@ -127,42 +126,22 @@ class Miner(BaseMinerNeuron):
         # ============================================================
         # STEP 2: GET PREDICTION FROM YOUR MODEL
         # ============================================================
-        # This is where your model's predict() method is called.
-        # Your model should return:
-        #   - prediction: float (the predicted LoadMw in MW)
-        #   - interval: [lower, upper] (90% confidence interval)
-        #
-        # If your model fails, it should return (None, None)
+        # Your model.predict(timestamp) returns Optional[float] (LoadMw in MW).
         # ============================================================
-        
+
         try:
-            prediction, interval = self.model.predict(timestamp)
-            
-            # Handle model failure
+            prediction = self.model.predict(timestamp)
+
             if prediction is None:
                 bt.logging.warning(
                     f"Model returned None prediction for timestamp {timestamp}. "
                     "Validator will ignore this response."
                 )
-                return synapse  # prediction and interval remain None
-            
-            # Attach prediction to synapse
+                return synapse
+
             synapse.prediction = prediction
-            
-            # Attach interval to synapse (convert to list if needed)
-            if interval is not None:
-                synapse.interval = list(interval) if not isinstance(interval, list) else interval
-            else:
-                bt.logging.warning(
-                    f"Model returned None interval for timestamp {timestamp}. "
-                    "Only point prediction will be scored."
-                )
-            
-            # Log successful prediction
-            bt.logging.success(
-                f"Prediction for {timestamp}: {prediction}, "
-                f"Interval: {synapse.interval}"
-            )
+
+            bt.logging.success(f"Prediction for {timestamp}: {prediction}")
             
         except Exception as e:
             # Handle unexpected errors gracefully

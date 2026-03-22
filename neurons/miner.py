@@ -3,7 +3,7 @@ import os
 import random
 import time
 from datetime import datetime, timedelta
-from typing import Tuple, Optional
+from typing import Optional
 import typing
 import bittensor as bt
 
@@ -22,11 +22,10 @@ from bittbridge.utils.timestamp import get_now
 # When a validator sends a Challenge synapse, this code:
 #   1. Fetches latest LoadMw data from ISO-NE API (fiveminutesystemload/day/{day}).
 #   2. Computes a simple moving average of the last N LoadMw values.
-#   3. Uses the MA as the predicted next LoadMw.
-#   4. Estimates a 90% confidence interval based on fixed volatility assumption.
-#   5. Attaches the prediction and interval to the synapse and returns it.
+#   3. Uses the MA as the predicted next LoadMw (point forecast for the target timestamp).
+#   4. Attaches the prediction to the synapse and returns it.
 #
-# Validators will later use this to score the miner's accuracy.
+# Validators score the miner's point forecast against actual demand.
 
 # Number of 5-minute steps for moving average (12 = 1 hour)
 N_STEPS = 12
@@ -63,14 +62,6 @@ def predict_next_load_ma(load_values: list, n_steps: int = N_STEPS) -> Optional[
     return float(sum(recent) / len(recent))
 
 
-def estimate_interval(prediction: float) -> Tuple[float, float]:
-    """Estimate a naive 90% confidence interval based on a fixed 1% volatility assumption."""
-    std_dev = 0.01  # Assume 1% standard deviation in load
-    lower = prediction - 1.64 * std_dev * prediction
-    upper = prediction + 1.64 * std_dev * prediction
-    return lower, upper
-
-
 class Miner(BaseMinerNeuron):
     """
     Miner neuron for New England energy demand (LoadMw) prediction.
@@ -93,9 +84,8 @@ class Miner(BaseMinerNeuron):
 
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
-        Responds to the Challenge synapse from the validator by submitting:
-        - a LoadMw prediction (moving average of recent 5-min system load)
-        - a 90% confidence interval based on fixed volatility assumption
+        Responds to the Challenge synapse from the validator with a LoadMw point prediction
+        (moving average of recent 5-min system load).
         """
         # Step 1: Fetch latest LoadMw data from API
         load_values = get_latest_load_mw_values(n_steps=N_STEPS)
@@ -115,19 +105,15 @@ class Miner(BaseMinerNeuron):
         # Step 4: Assign point prediction
         synapse.prediction = prediction
 
-        # Step 5: Estimate and assign 90% confidence interval
-        synapse.interval = list(estimate_interval(prediction))
-
-        # Step 6: Log successful prediction
+        # Step 5: Log successful prediction
         if self._add_test_noise:
             bt.logging.success(
                 f"Predicting LoadMw for timestamp={synapse.timestamp}: "
-                f"{prediction:.1f}, Interval: {synapse.interval} (with noise)"
+                f"{prediction:.1f} (with noise)"
             )
         else:
             bt.logging.success(
-                f"Predicting LoadMw for timestamp={synapse.timestamp}: "
-                f"{prediction:.1f}, Interval: {synapse.interval}"
+                f"Predicting LoadMw for timestamp={synapse.timestamp}: {prediction:.1f}"
             )
         return synapse
 
