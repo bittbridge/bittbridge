@@ -6,7 +6,6 @@ Students can use these instead of writing the predict function from scratch.
 """
 
 import pandas as pd
-import numpy as np
 
 
 def get_recent_prices(data, timestamp, n_steps=12):
@@ -39,39 +38,6 @@ def get_recent_prices(data, timestamp, n_steps=12):
     value_col = 'load_mw' if 'load_mw' in data.columns else 'close_price'
     recent_values = available_data[value_col].tail(n_steps).values
     return recent_values.reshape(1, n_steps, 1)
-
-
-def calculate_interval(prediction, method='fixed', std_error=None, percentage=0.01):
-    """
-    Calculate 90% confidence interval for a prediction.
-    
-    Works for both price and LoadMw (load in MW) predictions.
-    
-    Args:
-        prediction: The predicted value (float) - price or LoadMw
-        method: 'fixed' (use percentage) or 'std' (use standard error)
-        std_error: Standard error/standard deviation (for 'std' method)
-        percentage: Percentage of prediction to use as margin (for 'fixed' method, default: 1%)
-    
-    Returns:
-        List [lower_bound, upper_bound] for 90% confidence interval
-    
-    Example:
-        # Using fixed percentage (works for LoadMw ~12000)
-        interval = calculate_interval(12000.0, method='fixed', percentage=0.01)
-    """
-    z_score = 1.64  # Z-score for 90% confidence interval (two-tailed)
-    
-    if method == 'std' and std_error is not None:
-        margin = z_score * std_error
-    else:
-        # Fixed percentage method
-        margin = percentage * prediction
-    
-    lower = float(prediction - margin)
-    upper = float(prediction + margin)
-    
-    return [lower, upper]
 
 
 def prepare_dataframe(df, time_col=None, price_col=None):
@@ -127,51 +93,27 @@ def prepare_dataframe(df, time_col=None, price_col=None):
     return time_series_df
 
 
-def predict_1hour_ahead(model, data, timestamp, n_steps=12, interval_method='fixed', interval_std=None):
+def predict_1hour_ahead(model, data, timestamp, n_steps=12):
     """
-    Standard 1-hour-ahead prediction function.
-    
-    This is the complete standard prediction function. Students can use this
-    directly or customize it for their needs.
-    
+    Standard 1-hour-ahead point prediction.
+
     Args:
         model: Trained model (must have .predict() method)
         data: DataFrame with datetime index and 'close_price' or 'load_mw' column
         timestamp: ISO format timestamp string
         n_steps: Number of timesteps to use (default: 12 = 1 hour for 5-min data)
-        interval_method: 'fixed' or 'std' for confidence interval calculation
-        interval_std: Standard error for 'std' method
-    
+
     Returns:
-        Tuple of (prediction, interval) or (None, None) if prediction fails
-    
-    Example:
-        prediction, interval = predict_1hour_ahead(
-            model, data, "2024-01-15T10:30:00+00:00",
-            n_steps=12,
-            interval_method='std',
-            interval_std=0.002586
-        )
+        Predicted LoadMw (float), or None if prediction fails
     """
-    # Get recent prices
     X = get_recent_prices(data, timestamp, n_steps=n_steps)
-    
+
     if X is None:
-        return None, None
-    
-    # Make prediction
+        return None
+
     try:
         prediction = model.predict(X, verbose=0)[0, 0]
-        prediction = float(prediction)
+        return float(prediction)
     except Exception:
-        return None, None
-    
-    # Calculate interval
-    interval = calculate_interval(
-        prediction,
-        method=interval_method,
-        std_error=interval_std
-    )
-    
-    return prediction, interval
+        return None
 

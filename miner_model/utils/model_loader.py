@@ -27,7 +27,7 @@ def load_student_model() -> Optional[PredictionModel]:
     Example:
         model = load_student_model()
         if model:
-            prediction, interval = model.predict("2024-01-15T10:30:00+00:00")
+            prediction = model.predict("2024-01-15T10:30:00+00:00")
     """
     # Get the student_models directory path
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

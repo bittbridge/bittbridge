@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from typing import List, Optional
+from typing import Optional
 
 import bittensor as bt
 import pydantic
@@ -26,7 +26,7 @@ class Challenge(bt.Synapse):
     """
     Challenge Synapse:
     Used by validators to request a New England energy demand (LoadMw) prediction for a given timestamp.
-    Miners respond with a point estimate and an optional prediction interval.
+    Miners respond with a point estimate only.
     """
     
     # Required request input, filled by sending dendrite caller.
@@ -41,14 +41,7 @@ class Challenge(bt.Synapse):
     prediction: Optional[float] = pydantic.Field(
         default=None,
         title="Predictions",
-        description="The predictions to send to the dendrite caller",
-    )
-
-    # Optional request output, filled by recieving axon.
-    interval: Optional[List[float]] = pydantic.Field(
-        default=None,
-        title="Interval",
-        description="The predicted interval for the next hour. Formatted as [min, max]",
+        description="The predicted LoadMw (MW) to send to the dendrite caller",
     )
 
     def deserialize(self) -> float:
