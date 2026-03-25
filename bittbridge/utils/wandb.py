@@ -56,7 +56,7 @@ def log_wandb(
     miner_uids,
     hotkeys,
     moving_average_scores,
-    actual_load_mw=None,
+    ground_truth=None,
     timestamp=None,
 ):
     try:
@@ -93,7 +93,7 @@ def log_wandb(
 
         wandb_val_log = {
             "miners_info": miners_info,
-            "actual_load_mw": float(actual_load_mw) if actual_load_mw is not None else None,
+            "ground_truth": float(ground_truth) if ground_truth is not None else None,
             "timestamp": timestamp if timestamp is not None else None,
         }
 
@@ -110,8 +110,8 @@ def log_wandb(
                 wandb_val_log[f"miner_{uid}_reward"] = float(rew)
 
             # Log error only if possible
-            if point_pred is not None and actual_load_mw is not None:
-                error = abs(point_pred - actual_load_mw)
+            if point_pred is not None and ground_truth is not None:
+                error = abs(point_pred - ground_truth)
                 wandb_val_log[f"miner_{uid}_error"] = float(error)
 
         # Debug logging
