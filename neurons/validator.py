@@ -28,7 +28,7 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_ground_truth, reward, get_incentive_mechanism_rewards
+from bittbridge.validator.reward import get_actual_load_mw, reward, get_incentive_mechanism_rewards
 
 # Protocol imports
 from bittbridge.protocol import Challenge
@@ -109,7 +109,7 @@ class Validator(BaseValidatorNeuron):
                 
                 # Process each timestamp group
                 for timestamp, predictions in timestamp_groups.items():
-                    actual = get_ground_truth(timestamp)
+                    actual = get_actual_load_mw(timestamp)
                     if actual is not None:
                         # Convert predictions to Challenge objects for incentive mechanism scoring
                         responses = []
