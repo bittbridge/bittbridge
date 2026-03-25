@@ -68,12 +68,12 @@ def log_wandb(
             # supports dict {uid->val} or list/tuple indexed by uid
             try:
                 if isinstance(ma_scores, dict):
-                    return float(ma_scores[uid]) if uid in ma_scores else float("nan")
+                    return float(ma_scores[uid]) if uid in ma_scores else float('nan')
                 if isinstance(ma_scores, (list, tuple)):
-                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float("nan")
+                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float('nan')
             except Exception:
                 pass
-            return float("nan")
+            return float('nan')
 
         miners_info = {}
         for uid, resp, rew in zip(miner_uids, responses, rewards):
