@@ -119,7 +119,7 @@ class Validator(BaseValidatorNeuron):
                         
                         # Use incentive mechanism for scoring
                         rewards, updated_weights = get_incentive_mechanism_rewards(
-                            ground_truth=actual,
+                            actual_load_mw=actual,
                             responses=responses,
                         )
 

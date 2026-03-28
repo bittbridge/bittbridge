@@ -54,8 +54,10 @@ python -m neurons.miner \
   --wallet.name miner \
   --wallet.hotkey default \
   --logging.debug \
-  -- test
+  --test
 ```
+
+Use the flag **`--test`** (one word). Do not write `-- test` with a space: in the shell, `--` ends option parsing, so `test` is not treated as the `--test` flag and noise stays off.
 
 ---
 
