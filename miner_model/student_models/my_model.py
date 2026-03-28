@@ -90,16 +90,11 @@ data = prepare_dataframe(df)  # Helper handles all the formatting!
 
 def predict(timestamp):
     """
-    Predict New England LoadMw 1 hour ahead.
-    
-    Uses the standard prediction pattern via helper function.
-    You can customize the parameters below if needed.
+    Predict New England LoadMw 1 hour ahead (point forecast).
     """
     return predict_1hour_ahead(
         model=model,
         data=data,
         timestamp=timestamp,
-        n_steps=12,  # 12 timesteps = 1 hour (for 5-minute data)
-        interval_method='fixed',  # Change to 'std' if you have standard error
-        interval_std=None  # Set your std_error here if using 'std' method
+        n_steps=12,
     )

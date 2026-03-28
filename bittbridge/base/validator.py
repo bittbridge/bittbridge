@@ -19,7 +19,6 @@
 
 
 import copy
-import json
 import numpy as np
 import asyncio
 import argparse
@@ -353,7 +352,7 @@ class BaseValidatorNeuron(BaseNeuron):
         return True
 
     def update_scores(self, rewards: np.ndarray, uids: List[int]):
-        """Performs exponential moving average on the scores based on the rewards received from the miners."""
+        """Sets metagraph scores for the evaluated UIDs to this round's incentive weights (no EMA)."""
 
         # Check if rewards contains NaN values.
         if np.isnan(rewards).any():
@@ -385,19 +384,9 @@ class BaseValidatorNeuron(BaseNeuron):
                 f"cannot be broadcast to uids array of shape {uids_array.shape}"
             )
 
-        # Compute forward pass rewards, assumes uids are mutually exclusive.
-        # shape: [ metagraph.n ]
-        scattered_rewards: np.ndarray = np.zeros_like(self.scores)
-        scattered_rewards[uids_array] = rewards
-        bt.logging.debug(f"Scattered rewards: {rewards}")
-
-        # Update scores with rewards produced by this step.
-        # shape: [ metagraph.n ]
-        alpha: float = self.config.neuron.moving_average_alpha
-        self.scores: np.ndarray = (
-            alpha * scattered_rewards + (1 - alpha) * self.scores
-        )
-        bt.logging.debug(f"Updated moving avg scores: {self.scores}")
+        # Direct assignment: per-round normalized weights for miners evaluated in this batch.
+        self.scores[uids_array] = rewards
+        bt.logging.debug(f"Updated scores for UIDs {uids_array}: {rewards}")
 
     def save_state(self):
         """Saves the state of the validator to a file."""
@@ -410,15 +399,6 @@ class BaseValidatorNeuron(BaseNeuron):
             scores=self.scores,
             hotkeys=self.hotkeys,
         )
-        
-        # Save incentive mechanism-specific state if it exists
-        if hasattr(self, 'previous_weights') and hasattr(self, 'alpha'):
-            incentive_mechanism_state = {
-                'previous_weights': self.previous_weights,
-                'alpha': self.alpha
-            }
-            with open(self.config.neuron.full_path + "/incentive_mechanism_state.json", 'w') as f:
-                json.dump(incentive_mechanism_state, f)
 
     def load_state(self):
         """Loads the state of the validator from a file."""
@@ -429,20 +409,3 @@ class BaseValidatorNeuron(BaseNeuron):
         self.step = state["step"]
         self.scores = state["scores"]
         self.hotkeys = state["hotkeys"]
-        
-        # Load incentive mechanism-specific state if it exists
-        incentive_mechanism_state_path = self.config.neuron.full_path + "/incentive_mechanism_state.json"
-        if os.path.exists(incentive_mechanism_state_path):
-            try:
-                with open(incentive_mechanism_state_path, 'r') as f:
-                    incentive_mechanism_state = json.load(f)
-                    self.previous_weights = incentive_mechanism_state.get('previous_weights', {})
-                    self.alpha = incentive_mechanism_state.get('alpha', 0.00958)
-                    bt.logging.info(f"Loaded incentive mechanism state: alpha={self.alpha}, weights={len(self.previous_weights)} miners")
-            except Exception as e:
-                bt.logging.warning(f"Failed to load incentive mechanism state: {e}")
-                self.previous_weights = {}
-                self.alpha = 0.00958
-        else:
-            self.previous_weights = {}
-            self.alpha = 0.00958

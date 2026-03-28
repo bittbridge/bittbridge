@@ -64,13 +64,13 @@ def log_wandb(
         if hasattr(rewards, "tolist"):
             rewards = rewards.tolist()
 
-        def _ma_lookup(ma_scores, uid):
+        def _weight_lookup(weights_by_uid, uid):
             # supports dict {uid->val} or list/tuple indexed by uid
             try:
-                if isinstance(ma_scores, dict):
-                    return float(ma_scores[uid]) if uid in ma_scores else float('nan')
-                if isinstance(ma_scores, (list, tuple)):
-                    return float(ma_scores[uid]) if 0 <= uid < len(ma_scores) else float('nan')
+                if isinstance(weights_by_uid, dict):
+                    return float(weights_by_uid[uid]) if uid in weights_by_uid else float('nan')
+                if isinstance(weights_by_uid, (list, tuple)):
+                    return float(weights_by_uid[uid]) if 0 <= uid < len(weights_by_uid) else float('nan')
             except Exception:
                 pass
             return float('nan')
@@ -78,14 +78,13 @@ def log_wandb(
         miners_info = {}
         for uid, resp, rew in zip(miner_uids, responses, rewards):
             point_pred = getattr(resp, "prediction", None)
-            interval = getattr(resp, "interval", None)
+            #interval = getattr(resp, "interval", None)
 
             miners_info[str(uid)] = { # cast key to string for nicer W&B tables
                 "miner_hotkey": hotkeys.get(uid),
                 "miner_point_prediction": point_pred,
-                "miner_interval_prediction": interval,
                 "miner_reward": float(rew) if rew is not None else None,
-                "miner_moving_average": _ma_lookup(moving_average_scores, uid),
+                "miner_last_round_weight": _weight_lookup(last_round_weights, uid),
             }
 
         if not miners_info:

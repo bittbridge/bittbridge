@@ -28,7 +28,7 @@ from bittbridge.base.validator import BaseValidatorNeuron
 from bittbridge.validator import forward
 
 # Reward calculation utilities
-from bittbridge.validator.reward import get_actual_load_mw, reward, get_incentive_mechanism_rewards
+from bittbridge.validator.reward import get_actual_load_mw, get_incentive_mechanism_rewards
 
 # Protocol imports
 from bittbridge.protocol import Challenge
@@ -71,10 +71,6 @@ class Validator(BaseValidatorNeuron):
             self.hotkeys = {}
 
         self.prediction_queue = []  # Store pending predictions here
-        
-        # Initialize incentive mechanism parameters
-        self.alpha = 0.00958  # EMA smoothing factor from incentive mechanism
-        self.previous_weights = {}  # Store previous epoch weights for EMA
 
     async def forward(self):
         """
@@ -118,7 +114,6 @@ class Validator(BaseValidatorNeuron):
                             # Create a mock Challenge response
                             response = Challenge(timestamp=timestamp)
                             response.prediction = pred["prediction"]
-                            response.interval = pred.get("interval")
                             responses.append(response)
                             miner_uids.append(pred["miner_uid"])
                         
@@ -126,32 +121,25 @@ class Validator(BaseValidatorNeuron):
                         rewards, updated_weights = get_incentive_mechanism_rewards(
                             ground_truth=actual,
                             responses=responses,
-                            previous_weights=self.previous_weights,
-                            alpha=self.alpha
                         )
-                        
-                        
-                        # Map index-keyed weights, which are aligned with responses, to real UIDs for W&B
+
+                        # Map index-keyed weights (aligned with responses) to real UIDs for W&B
                         if isinstance(updated_weights, dict):
-                             self.moving_average_scores = {
-                                  int(miner_uids[int(i)]): float(v)
-                                  for i, v in updated_weights.items()
-                                  if 0 <= int(i) < len(miner_uids)
-                                  }
+                            self.last_round_weights = {
+                                int(miner_uids[int(i)]): float(v)
+                                for i, v in updated_weights.items()
+                                if 0 <= int(i) < len(miner_uids)
+                            }
                         elif isinstance(updated_weights, (list, tuple)):
-                             self.moving_average_scores = {
-                                  int(miner_uids[i]): float(v)
-                                  for i, v in enumerate(updated_weights)
-                                  if 0 <= i < len(miner_uids)
-                                  }
+                            self.last_round_weights = {
+                                int(miner_uids[i]): float(v)
+                                for i, v in enumerate(updated_weights)
+                                if 0 <= i < len(miner_uids)
+                            }
                         else:
-                             self.moving_average_scores = {}
-                        
-                        # Update scores using the new reward system
+                            self.last_round_weights = {}
+
                         self.update_scores(rewards, miner_uids)
-                        
-                        # Update previous weights for next epoch
-                        self.previous_weights = updated_weights
                         
                         # Collect data for W&B logging
                         for i, pred in enumerate(predictions):
@@ -166,7 +154,6 @@ class Validator(BaseValidatorNeuron):
                             bt.logging.info(
                                 f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
-                                f"Interval={pred.get('interval')}, "
                                 f"Actual LoadMw={actual}, "
                                 f"Reward={rewards[i]:.4f}"
                             )
@@ -183,9 +170,9 @@ class Validator(BaseValidatorNeuron):
             # Log to W&B if we have data and W&B is available
             if getattr(self, "_wandb_ok", False) and wb_uids:
                 try:
-                    moving_avgs = getattr(self, "moving_average_scores", {})
-                    if not isinstance(moving_avgs, dict):
-                        moving_avgs = {}
+                    last_w = getattr(self, "last_round_weights", {})
+                    if not isinstance(last_w, dict):
+                        last_w = {}
                     log_wandb(
                         responses=wb_responses,
                         rewards=wb_rewards,
