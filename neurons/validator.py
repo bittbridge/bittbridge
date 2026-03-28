@@ -173,12 +173,19 @@ class Validator(BaseValidatorNeuron):
                     last_w = getattr(self, "last_round_weights", {})
                     if not isinstance(last_w, dict):
                         last_w = {}
+                    n_scores = len(self.scores)
+                    moving_avgs = {
+                        int(uid): float(self.scores[int(uid)])
+                        for uid in wb_uids
+                        if 0 <= int(uid) < n_scores
+                    }
                     log_wandb(
                         responses=wb_responses,
                         rewards=wb_rewards,
                         miner_uids=wb_uids,
                         hotkeys=getattr(self, "hotkeys", {}),
                         moving_average_scores=moving_avgs,
+                        last_round_weights=last_w,
                         ground_truth=actual,
                         timestamp=timestamp,
                         # ground_truth=wb_actuals,
