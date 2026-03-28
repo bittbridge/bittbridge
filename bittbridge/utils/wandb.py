@@ -56,6 +56,7 @@ def log_wandb(
     miner_uids,
     hotkeys,
     moving_average_scores,
+    last_round_weights=None,
     ground_truth=None,
     timestamp=None,
 ):
@@ -63,6 +64,8 @@ def log_wandb(
         # rewards may be list or numpy array; make it list
         if hasattr(rewards, "tolist"):
             rewards = rewards.tolist()
+
+        lw = last_round_weights if isinstance(last_round_weights, dict) else {}
 
         def _weight_lookup(weights_by_uid, uid):
             # supports dict {uid->val} or list/tuple indexed by uid
@@ -80,11 +83,13 @@ def log_wandb(
             point_pred = getattr(resp, "prediction", None)
             #interval = getattr(resp, "interval", None)
 
+            ma = _weight_lookup(moving_average_scores, uid) if moving_average_scores is not None else float("nan")
             miners_info[str(uid)] = { # cast key to string for nicer W&B tables
                 "miner_hotkey": hotkeys.get(uid),
                 "miner_point_prediction": point_pred,
                 "miner_reward": float(rew) if rew is not None else None,
-                "miner_last_round_weight": _weight_lookup(last_round_weights, uid),
+                "miner_moving_average_score": ma,
+                "miner_last_round_weight": _weight_lookup(lw, uid),
             }
 
         if not miners_info:
