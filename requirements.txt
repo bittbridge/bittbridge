@@ -3,7 +3,6 @@ starlette>=0.30.0
 pydantic>=2
 rich>=13
 pytest>=8
-torch>=2
 numpy>=1.24.0
 pandas>=2.0.0
 setuptools>=68
