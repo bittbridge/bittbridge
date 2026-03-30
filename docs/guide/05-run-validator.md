@@ -2,7 +2,7 @@
 
 Run the validator **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use tmux session to run validator, and detach to leave it running 24/7.
 
-**Before running:** You need to sign up for ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Then add your username and password to `.env` (copy from `.env.example` and set `ISO_NE_USERNAME` and `ISO_NE_PASSWORD`). Run `python test.py` to verify API access.
+**Before running:** You need to sign up for ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Then add your username and password to `.env` (copy from `.env.example` and set `ISO_NE_USERNAME` and `ISO_NE_PASSWORD`)
 
 ---
 
