@@ -1,5 +1,4 @@
-
-# **BittBridge Subnet Incentive Mechanism**
+# 9. BittBridge Subnet Incentive Mechanism
 
 ## **Energy Demand Forecasting**
 ### **Overview**
@@ -177,3 +176,7 @@ This design ensures:
 - transparent and reproducible evaluation
 
 Participants are encouraged to develop models that outperform the baseline in order to maximize their rewards.
+
+---
+
+**Prev:** [08 – Troubleshooting](08-troubleshooting.md) | **Next:** [10 – Training Custom Model](10-training-custom-model.md) | [Back to Guide Index](../../README.md#guide)

@@ -1,6 +1,6 @@
-# 5. Wallets and Tokens
+# 3. Wallets and Tokens
 
-All steps in this section are done **on the GCP VM** (or locally if using [08 – Local Run (Advanced)](08-local-run-advanced.md)).
+All steps in this section are done **on the GCP VM** (or locally if using [07 – Local Run (Advanced)](07-local-run-advanced.md)).
 
 ---
 
@@ -131,4 +131,4 @@ Here's a guide how to do it:
 
 ---
 
-**Prev:** [04 – GCP VM Setup](04-gcp-vm-setup.md) | **Next:** [06 – Run Miner](06-run-miner.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** [02 – GCP VM Setup](02-gcp-vm-setup.md) | **Next:** [04 – Run Miner](04-run-miner.md) | [Back to Guide Index](../../README.md#guide)

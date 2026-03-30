@@ -110,7 +110,7 @@ class Miner(BaseMinerNeuron):
         3. Attaches the point prediction to the synapse
         4. Returns the synapse to the validator
 
-        The validator scores point forecasts per docs/guide/10-incentive mechanism.md.
+        The validator scores point forecasts per docs/guide/09-incentive-mechanism.md.
 
         Args:
             synapse: Challenge synapse containing the timestamp to predict from

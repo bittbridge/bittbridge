@@ -1,6 +1,8 @@
-# 4. GCP VM Setup
+# 2. GCP VM Setup
 
-This guide walks you through creating a Google Cloud VM, configuring the firewall, and setting up the environment. All steps after VM creation happen in the SSH terminal.
+This is the **main setup path** for the course: create a Google Cloud VM, open the miner port, install tools, clone **your fork**, and create the Python virtual environment. Everything below that says “on the VM” assumes you completed this guide first.
+
+This guide walks you through creating a Google Cloud VM, configuring the firewall, and preparing the repository. All steps after VM creation happen in the SSH terminal.
 
 ---
 
@@ -118,9 +120,9 @@ tmux lets you run miner and validator in separate panes; if the SSH connection d
 sudo apt install -y tmux
 ```
 
-### Step 12 – Clone Your Fork
+### Step 12 – Clone your fork
 
-Replace `YOUR_USERNAME` with your GitHub username:
+You must have [forked the repository on GitHub](01-before-you-start.md) first. Replace `YOUR_USERNAME` with your GitHub username:
 
 ```bash
 cd ~
@@ -137,6 +139,12 @@ pip install -r requirements.txt
 
 You should see `(venv)` in your prompt. Always run `source venv/bin/activate` in new terminals/tmux panes before running miner or validator.
 
+Create a local env file from the template (you will add API credentials in [03 – Wallets and Tokens](03-wallets-and-tokens.md)):
+
+```bash
+cp .env.example .env
+```
+
 ### Step 14 – Verify Setup
 
 ```bash
@@ -144,7 +152,7 @@ btcli --version
 python3 -c "import bittensor; print('Bittensor OK')"
 ```
 
-If both succeed, you're ready for [05 – Wallets and Tokens](05-wallets-and-tokens.md).
+If both succeed, you're ready for [03 – Wallets and Tokens](03-wallets-and-tokens.md).
 
 ---
 
@@ -162,4 +170,4 @@ If both succeed, you're ready for [05 – Wallets and Tokens](05-wallets-and-tok
 
 ---
 
-**Prev:** [03 – Training Custom Model](03-training-custom-model.md) | **Next:** [05 – Wallets and Tokens](05-wallets-and-tokens.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** [01 – Before You Start](01-before-you-start.md) | **Next:** [03 – Wallets and Tokens](03-wallets-and-tokens.md) | [Back to Guide Index](../../README.md#guide)

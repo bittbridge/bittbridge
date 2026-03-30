@@ -2,24 +2,25 @@
 
 ---
 
-## GitHub Knowledge
+## GitHub: fork before you clone
 
-**Make sure your GitHub knowledge is solid before starting.** A common mistake is cloning the main repository and trying to commit changes there. You must work from your own fork.
+**Make sure your GitHub workflow is clear before you start.** A common mistake is cloning the upstream repository and trying to push changes there. You work from **your own fork**.
 
-- **Practice first:** Fork the repository, make an edit (~~remove this line~~), commit, and push to your fork before attempting this task.
-- **Always fork:** Create your own fork of the Bittbridge repository, then clone your fork.
-- **Never commit to main:** Do not clone `bittbridge/bittbridge` directly and push changes to the main branch.
+- **Practice first:** Fork [bittbridge/bittbridge](https://github.com/bittbridge/bittbridge), make a small edit, commit, and push to **your** fork.
+- **Never push to upstream main:** Do not push changes to `bittbridge/bittbridge` unless you are a maintainer.
+
+You will clone **your fork** on the GCP VM in [02 – GCP VM Setup](02-gcp-vm-setup.md).
 
 ---
 
-## Key Concepts
+## Key concepts
 
 Understanding these will help you follow the setup:
 
 | Concept | Description |
 |---------|-------------|
-| **Virtual Machine (VM)** | A remote computer (e.g., on Google Cloud) that runs 24/7. You SSH into it (read connect to remote terminal) to run your miner/validator. |
-| **Virtual Environment (.venv)** | An isolated Python environment for this project. Keeps Bittensor and TensorFlow dependencies separate from other projects. Always activate it before running commands. |
+| **Virtual Machine (VM)** | A remote computer on Google Cloud that can run 24/7. You SSH into it to run your miner and validator. |
+| **Virtual environment (`venv`)** | An isolated Python environment for this project. Keeps Bittensor and dependencies separate from the system Python. Activate it before running miner or validator commands. |
 | **Miner** | Serves predictions to the network. Validators send challenges; miners respond with predictions. |
 | **Validator** | Scores miners' work and sets weights. Queries miners, evaluates predictions, and rewards accurate ones. |
 
@@ -27,10 +28,8 @@ Understanding these will help you follow the setup:
 
 ## Prerequisites
 
-- **Google Cloud Platform:** Activated free trial
-- **Windows:** [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/about) with Ubuntu (use Linux for this guide)
-- **macOS/Linux:** Terminal with Python 3.9+
+- **Google Cloud Platform:** Free trial activated (you will create the VM in the next guide).
 
 ---
 
-**Prev:** — | **Next:** [02 – Local Setup](02-local-setup.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** — | **Next:** [02 – GCP VM Setup](02-gcp-vm-setup.md) | [Back to Guide Index](../../README.md#guide)

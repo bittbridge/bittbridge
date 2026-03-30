@@ -1,4 +1,4 @@
-# 9. Troubleshooting
+# 8. Troubleshooting
 
 **If you see `[NO_SUBMISSION]` errors or validators can't connect to miners, this section is for you!**
 
@@ -134,4 +134,4 @@ If running validators on VPS:
 
 ---
 
-**Prev:** [08 – Local Run (Advanced)](08-local-run-advanced.md) | **Next:** — | [Back to Guide Index](../../README.md#guide)
+**Prev:** [07 – Local Run (Advanced)](07-local-run-advanced.md) | **Next:** [09 – Incentive Mechanism](09-incentive-mechanism.md) | [Back to Guide Index](../../README.md#guide)

@@ -1,4 +1,4 @@
-# 7. Run Validator
+# 5. Run Validator
 
 Run the validator **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use tmux session to run validator, and detach to leave it running 24/7.
 
@@ -8,7 +8,7 @@ Run the validator **on the GCP VM** from the repo root (`bittbridge/`) with venv
 
 ## Using tmux
 
-tmux keeps your  validator running even if you disconnect from SSH. Create a session, run your processes, then detach.
+tmux keeps your validator running even if you disconnect from SSH. Create a session, run your processes, then detach.
 
 ### Create a tmux session
 
@@ -44,7 +44,7 @@ Use the **hotkey name** (e.g., `default`), not the ss58 address.
 
 Press **`Ctrl+b`** release then **`d`** 
 
-Validator keep running. Reconnect later with:
+The validator keeps running. Reconnect later with:
 
 ```bash
 tmux attach -t validator
@@ -52,4 +52,4 @@ tmux attach -t validator
 
 ---
 
-**Prev:** [06 – Run Miner](06-run-miner.md) | **Next:** [08 – Local Run (Advanced)](08-local-run-advanced.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** [04 – Run Miner](04-run-miner.md) | **Next:** [06 – Update the Repo and Restart Miner & Validator](06-update-and-restart.md) | [Back to Guide Index](../../README.md#guide)

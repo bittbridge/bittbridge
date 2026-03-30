@@ -42,10 +42,9 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 ## Quick Start
 
 1. **You need:** GitHub account, GCP free trial, tTAO (testnet tokens)
-2. **ISO-NE API:** Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false), then add your username and password to `.env` (copy from `.env.example`).
-3. **Verify API:** Run `python test.py` to confirm API access before starting miner or validator.
-4. **Standard path:** Deploy on a GCP VM (recommended)
-5. **Follow the guide:** Step-by-step instructions below
+2. **Follow the guide in order:** Start with [Before You Start](docs/guide/01-before-you-start.md), then [GCP VM Setup](docs/guide/02-gcp-vm-setup.md) — that is the main path for the course.
+3. **ISO-NE API:** Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false), then add your username and password to `.env` (copy from `.env.example`).
+4. **Verify API:** Run `python test.py` to confirm API access before starting miner or validator.
 
 ---
 
@@ -53,15 +52,16 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 
 | # | Topic | Description |
 |---|-------|-------------|
-| 1 | [Before You Start](docs/guide/01-before-you-start.md) | GitHub, concepts, versioning |
-| 2 | [Local Setup](docs/guide/02-local-setup.md) | Fork, clone, environment |
-| 3 | [Training Custom Model](docs/guide/03-training-custom-model.md) | Advanced – currently not working (TensorFlow bug) |
-| 4 | [GCP VM Setup](docs/guide/04-gcp-vm-setup.md) | Ubuntu, tmux, venv, firewall |
-| 5 | [Wallets and Tokens](docs/guide/05-wallets-and-tokens.md) | On VM: create/import, tTAO, register |
-| 6 | [Run Miner](docs/guide/06-run-miner.md) | Basic: `neurons/miner.py` (moving average) |
-| 7 | [Run Validator](docs/guide/07-run-validator.md) | On GCP VM |
-| 8 | [Local Run (Advanced)](docs/guide/08-local-run-advanced.md) | Run everything locally instead of VM |
-| 9 | [Troubleshooting](docs/guide/09-troubleshooting.md) | Port forwarding, connectivity |
+| 1 | [Before You Start](docs/guide/01-before-you-start.md) | GitHub fork, concepts |
+| 2 | [GCP VM Setup](docs/guide/02-gcp-vm-setup.md) | Sign up, VM, firewall, clone fork, venv, tmux |
+| 3 | [Wallets and Tokens](docs/guide/03-wallets-and-tokens.md) | On VM: create/import, tTAO, register, API keys |
+| 4 | [Run Miner](docs/guide/04-run-miner.md) | `neurons/miner.py` (moving average), `N_STEPS` |
+| 5 | [Run Validator](docs/guide/05-run-validator.md) | On GCP VM |
+| 6 | [Update the Repo and Restart](docs/guide/06-update-and-restart.md) | `git pull`, restart miner and validator in tmux |
+| 7 | [Local Run (Advanced)](docs/guide/07-local-run-advanced.md) | Optional: run everything locally instead of a VM |
+| 8 | [Troubleshooting](docs/guide/08-troubleshooting.md) | Port forwarding, connectivity |
+| 9 | [Incentive Mechanism](docs/guide/09-incentive-mechanism.md) | How scoring and rewards work |
+| 10 | [Training Custom Model](docs/guide/10-training-custom-model.md) | Advanced – optional; TensorFlow path currently not working |
 
 ---
 ## Final Checklist

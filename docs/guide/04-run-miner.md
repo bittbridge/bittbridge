@@ -1,8 +1,8 @@
-# 6. Run Miner
+# 4. Run Miner
 
-Run the miner **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use tmux session to run miner, and detach to leave it running 24/7.
+Run the miner **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use a tmux session to run the miner, then detach to leave it running 24/7.
 
-**Before running:** You need to sign up for ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Then add your username and password to `.env` (copy from `.env.example` and set `ISO_NE_USERNAME` and `ISO_NE_PASSWORD`). Run `python test.py` to verify API access.
+**Before running:** You need ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Put your username and password in `.env` (see [03 – Wallets and Tokens](03-wallets-and-tokens.md)). Run `python test.py` to verify API access.
 
 ---
 
@@ -16,21 +16,34 @@ tmux keeps your miner (and validator) running even if you disconnect from SSH. C
 tmux new -s miner
 ```
 
-You are now inside a tmux session named `miner`
+You are now inside a tmux session named `miner`.
 
 ### Run the miner
 
-Activate venv and run the miner:
+Activate venv and go to the repo:
 
 ```bash
 cd ~/bittbridge
 source venv/bin/activate
 ```
 
-**Basic scenario – moving average miner **
-You can make changes in moving average period updating N_STEPS variable in neurons/miner.py, by default it is 12 (Number of 5-minute steps for moving average (12 = 1 hour)).
+### Moving average miner (default)
+
+The default miner uses a simple moving average over recent LoadMw values from the ISO-NE API.
+
+**Customize the window length (encouraged):** So that different students do not all use identical settings, change the lookback length in `neurons/miner.py`. At the top of the file you will find:
+
+```python
+# Number of 5-minute steps for moving average (12 = 1 hour)
+N_STEPS = 12
+```
+
+- Each step is **5 minutes** of data, so `N_STEPS = 12` means a **1-hour** window.
+- Pick a different integer (for example between **6** and **24**) and save the file before you start the miner. Use a value that makes sense to you; the goal is to avoid everyone using the same default.
+
 <img width="682" height="445" alt="Screenshot 2026-03-01 at 4 50 09 PM" src="https://github.com/user-attachments/assets/da02295a-c3d0-4afe-b787-a0ea6790d1f0" />
 
+Run the miner:
 
 ```bash
 python -m neurons.miner \
@@ -76,11 +89,13 @@ python -m miner_model.miner_plugin \
   --logging.debug
 ```
 
+---
+
 ### Detach – leave running 24/7
 
 Press **`Ctrl+b`** then **`d`**.
 
-Your session stays running in the background. You can close the SSH window; the miner keep running.
+Your session stays running in the background. You can close the SSH window; the miner **keeps** running.
 
 ### Reattach to the session
 
@@ -89,6 +104,8 @@ When you SSH back into the VM:
 ```bash
 tmux attach -t miner
 ```
+
+When the repo is updated and you need to pull and restart **both** the miner and the validator, use **[06 – Update the Repo and Restart Miner & Validator](06-update-and-restart.md)**.
 
 ---
 
@@ -105,8 +122,8 @@ tmux attach -t miner
 ## Where to Run
 
 - **Working directory:** `~/bittbridge` (repo root)
-- **venv:** Always run `source venv/bin/activate` before miner
+- **venv:** Always run `source venv/bin/activate` before the miner
 
 ---
 
-**Prev:** [05 – Wallets and Tokens](05-wallets-and-tokens.md) | **Next:** [07 – Run Validator](07-run-validator.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** [03 – Wallets and Tokens](03-wallets-and-tokens.md) | **Next:** [05 – Run Validator](05-run-validator.md) | [Back to Guide Index](../../README.md#guide)

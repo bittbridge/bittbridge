@@ -1,6 +1,6 @@
-# 3. Training Custom Model (Advanced – Currently Not Working)
+# 10. Training Custom Model (Advanced – Currently Not Working)
 
-> **Note:** This is an advanced path. The basic scenario is to run `neurons/miner.py` (moving average miner) – see [06 – Run Miner](06-run-miner.md). Custom LSTM/RNN model loading via TensorFlow is **currently not working** due to a model-loading bug. Use the built-in moving average miner instead.
+> **Note:** This is an optional, advanced topic at the **end** of the guide. The path everyone uses in class is [04 – Run Miner](04-run-miner.md) (`neurons/miner.py`, moving average). Custom LSTM/RNN model loading via TensorFlow is **currently not working** due to a model-loading bug. Use the built-in moving average miner instead.
 
 To use your own prediction model (when fixed), you would train it in a Jupyter notebook and plug it into the miner. Use `miner_model/LSTM_outside_example` as reference.
 
@@ -50,4 +50,4 @@ See [miner_model/README.md](../../miner_model/README.md) for details.
 
 ---
 
-**Prev:** [02 – Local Setup](02-local-setup.md) | **Next:** [04 – GCP VM Setup](04-gcp-vm-setup.md) | [Back to Guide Index](../../README.md#guide)
+**Prev:** [09 – Incentive Mechanism](09-incentive-mechanism.md) | **Next:** — | [Back to Guide Index](../../README.md#guide)
