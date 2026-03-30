@@ -114,7 +114,7 @@ sudo apt install -y python3-venv python3-pip
 
 ### Step 11 – Install tmux
 
-tmux lets you run miner and validator in separate panes; if the SSH connection drops, processes keep running.
+tmux lets you run miner and validator in separate sessions; if the SSH connection drops, processes keep running.
 
 ```bash
 sudo apt install -y tmux
@@ -137,13 +137,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-You should see `(venv)` in your prompt. Always run `source venv/bin/activate` in new terminals/tmux panes before running miner or validator.
-
-Create a local env file from the template (you will add API credentials in [03 – Wallets and Tokens](03-wallets-and-tokens.md)):
-
-```bash
-cp .env.example .env
-```
+You should see `(venv)` in your prompt. Always run `source venv/bin/activate` in new terminals/tmux sessions before running miner or validator.
 
 ### Step 14 – Verify Setup
 
@@ -160,12 +154,9 @@ If both succeed, you're ready for [03 – Wallets and Tokens](03-wallets-and-tok
 
 | Action | Command |
 |--------|---------|
-| Create new session | `tmux new -s bittbridge` |
-| Split pane horizontally | `Ctrl+b` then `"` |
-| Split pane vertically | `Ctrl+b` then `%` |
-| Switch between panes | `Ctrl+b` then arrow keys |
+| Create new session | `tmux new -s SESSION_NAME` |
 | Detach (leave running) | `Ctrl+b` then `d` |
-| Reattach | `tmux attach -t bittbridge` |
+| Reattach | `tmux attach -t SESSION_NAME` |
 | Kill session | `tmux kill-session -t bittbridge` |
 
 ---
