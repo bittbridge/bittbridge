@@ -32,12 +32,11 @@ export WANDB_API_KEY="PASTE_YOUR_WANDB_API_KEY"
 python3 -m neurons.validator \
   --netuid 183 \
   --subtensor.network test \
-  --wallet.name YOUR_VALIDATOR_NAME \
-  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
+  --wallet.name validator \
+  --wallet.hotkey default \
   --logging.debug
 ```
 
-Use the **hotkey name** (e.g., `default`), not the ss58 address.
 ---
 
 ### Detach – leave running 24/7
