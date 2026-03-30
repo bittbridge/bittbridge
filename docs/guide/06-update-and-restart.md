@@ -39,7 +39,7 @@ cd ~/bittbridge
 git pull
 ```
 
-If you use a **fork** and `git pull` does not bring in changes from the upstream class repository, add that repo as a remote and merge from it (your instructor can give you the remote URL and branch names).
+If you use a **fork** and `git pull` does not bring in changes from the upstream class repository, add that repo as a remote and merge from it
 
 ---
 
