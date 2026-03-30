@@ -71,22 +71,6 @@ python -m neurons.miner \
 
 Use the flag **`--test`** (one word). Do not write `-- test` with a space: in the shell, `--` ends option parsing, so `test` is not treated as the `--test` flag and noise stays off.
 
----
-
-## Advanced: Custom model miner (currently not working)
-
-Training and loading custom LSTM/RNN models via `miner_model` is advanced and **currently not working** due to a TensorFlow model-loading bug. Use the basic moving average miner above instead.
-
-If you need the custom model path for future use:
-
-```bash
-python -m miner_model.miner_plugin \
-  --netuid 183 \
-  --subtensor.network test \
-  --wallet.name miner \
-  --wallet.hotkey default \
-  --logging.debug
-```
 
 ---
 
