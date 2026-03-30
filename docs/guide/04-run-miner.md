@@ -2,8 +2,7 @@
 
 Run the miner **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use a tmux session to run the miner, then detach to leave it running 24/7.
 
-**Before running:** You need ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Put your username and password in `.env` (see [03 – Wallets and Tokens](03-wallets-and-tokens.md)). Run `python test.py` to verify API access.
-
+**Before running:** You need ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Put your username and password in `.env` (see [03 – Wallets and Tokens](03-wallets-and-tokens.md)).
 ---
 
 ## Using tmux
