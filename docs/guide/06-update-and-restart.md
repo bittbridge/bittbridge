@@ -43,31 +43,18 @@ If you use a **fork** and `git pull` does not bring in changes from the upstream
 
 ---
 
-## 4. Refresh Python dependencies (if needed)
-
-If `requirements.txt` changed, reinstall:
-
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
----
-
-## 5. Start the miner again
+## 4. Start the miner again
 
 ```bash
 tmux attach -t miner
 ```
-
-If the session is empty or you prefer a fresh session: `tmux new -s miner` (only if you killed the old one).
 
 ```bash
 cd ~/bittbridge
 source venv/bin/activate
 ```
 
-Run the same command you used before, for example:
+Run the same command you used before (Arrow UP):
 
 ```bash
 python -m neurons.miner \
@@ -82,7 +69,7 @@ Detach: **`Ctrl+b`** then **`d`**.
 
 ---
 
-## 6. Start the validator again
+## 5. Start the validator again
 
 ```bash
 tmux attach -t validator
@@ -97,8 +84,8 @@ export WANDB_API_KEY="PASTE_YOUR_WANDB_API_KEY"
 python3 -m neurons.validator \
   --netuid 183 \
   --subtensor.network test \
-  --wallet.name YOUR_VALIDATOR_NAME \
-  --wallet.hotkey YOUR_VALIDATOR_HOTKEY_NAME \
+  --wallet.name validator \
+  --wallet.hotkey default \
   --logging.debug
 ```
 
@@ -115,9 +102,8 @@ Use the same wallet and hotkey names as in [05 – Run Validator](05-run-validat
 | 1 | `tmux attach -t miner` → `Ctrl+C` → detach |
 | 2 | `tmux attach -t validator` → `Ctrl+C` → detach |
 | 3 | `cd ~/bittbridge` && `git pull` |
-| 4 | `pip install -r requirements.txt` if dependencies changed |
-| 5 | Restart miner in `miner` tmux session |
-| 6 | Restart validator in `validator` tmux session |
+| 4 | Restart miner in `miner` tmux session |
+| 5 | Restart validator in `validator` tmux session |
 
 ---
 
