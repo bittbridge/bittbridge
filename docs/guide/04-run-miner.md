@@ -94,9 +94,11 @@ When the repo is updated, use **[Update and restart](update-and-restart.md)**.
 
 ---
 
-## TODO (maintainers)
+## How it should look like:
 
-- [ ] Add a screenshot at the end of this page showing **healthy miner logs** (what students should see when the moving average miner is running correctly).
+- **Healthy miner logs** - if you see green success and point prediction logs -> then Congratulations ! You've set prediction model on decentralized ai network !
+  
+<img width="1446" height="610" alt="Screenshot 2026-04-03 at 8 59 01 AM" src="https://github.com/user-attachments/assets/0da74aeb-13bc-4ab6-8755-88567c0377b5" />
 
 ---
 
