@@ -2,12 +2,14 @@
 
 Run the miner **on the GCP VM** from the repo root (`bittbridge/`) with venv activated. Use a tmux session to run the miner, then detach to leave it running 24/7.
 
+This is the **default course deployment**: the built-in **moving average** miner in `neurons/miner.py`. 
+
 **Before running:** You need ISO-NE API access at [Sign up / Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false). Put your username and password in `.env` (see [03 – Wallets and Tokens](03-wallets-and-tokens.md)).
 ---
 
 ## Using tmux
 
-tmux keeps your miner (and validator) running even if you disconnect from SSH. Create a session, run your processes, then detach.
+tmux keeps your miner running even if you disconnect from SSH. Create a session, run your process, then detach.
 
 ### Create a tmux session
 
@@ -88,7 +90,13 @@ When you SSH back into the VM:
 tmux attach -t miner
 ```
 
-When the repo is updated and you need to pull and restart **both** the miner and the validator, use **[06 – Update the Repo and Restart Miner & Validator](06-update-and-restart.md)**.
+When the repo is updated, use **[Update and restart](update-and-restart.md)**.
+
+---
+
+## TODO (maintainers)
+
+- [ ] Add a screenshot at the end of this page showing **healthy miner logs** (what students should see when the moving average miner is running correctly).
 
 ---
 
@@ -109,4 +117,4 @@ When the repo is updated and you need to pull and restart **both** the miner and
 
 ---
 
-**Prev:** [03 – Wallets and Tokens](03-wallets-and-tokens.md) | **Next:** [05 – Run Validator](05-run-validator.md) | [Back to Guide Index](../../README.md#guide)
+[← 3. Wallets and tokens](03-wallets-and-tokens.md) · [Update and restart](update-and-restart.md) · [Guide](../../README.md#guide)

@@ -1,6 +1,6 @@
 # Miner Model Plugin – Quick Reference
 
-For the full setup guide (fork, clone, wallets, registration, API keys, running miner/validator), see the **[Guide Index](../README.md#guide)** or start with [01 – Before You Start](../docs/guide/01-before-you-start.md).
+Setup: **[Guide](../README.md#guide)** or [1. Before you start](../docs/guide/01-before-you-start.md). Validators / troubleshooting: **[Advanced](../docs/guide/advanced/README.md)**.
 
 This page covers only miner-model-specific details.
 
@@ -67,4 +67,4 @@ Use the **hotkey name** (e.g., `default`), not the ss58 address.
 | "No .csv data files found" | Add a `.csv` file in `miner_model/` or customize `data_path` in SECTION 2 |
 | "Prediction returned None" | Check data format and sufficient historical data |
 
-For network connectivity, port forwarding, and `[NO_SUBMISSION]` errors, see **[08 – Troubleshooting](../docs/guide/08-troubleshooting.md)**.
+Network issues: **[Troubleshooting](../docs/guide/advanced/troubleshooting.md)**.

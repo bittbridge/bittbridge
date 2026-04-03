@@ -1,6 +1,6 @@
 # 2. GCP VM Setup
 
-This is the **main setup path** for the course: create a Google Cloud VM, open the miner port, install tools, clone **your fork**, and create the Python virtual environment. Everything below that says “on the VM” assumes you completed this guide first.
+This is the **main setup path** for the course: create a Google Cloud VM, open the miner port, install tools, clone the [upstream repository](https://github.com/bittbridge/bittbridge), and create the Python virtual environment. Everything below that says “on the VM” assumes you completed this guide first.
 
 This guide walks you through creating a Google Cloud VM, configuring the firewall, and preparing the repository. All steps after VM creation happen in the SSH terminal.
 
@@ -114,19 +114,19 @@ sudo apt install -y python3-venv python3-pip
 
 ### Step 11 – Install tmux
 
-tmux lets you run miner and validator in separate sessions; if the SSH connection drops, processes keep running.
+tmux lets you run the miner in a persistent session; if the SSH connection drops, the process keeps running.
 
 ```bash
 sudo apt install -y tmux
 ```
 
-### Step 12 – Clone your fork
+### Step 12 – Clone the repository
 
-You must have [forked the repository on GitHub](01-before-you-start.md) first. Replace `YOUR_USERNAME` with your GitHub username:
+Clone the main repo:
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/bittbridge.git
+git clone https://github.com/bittbridge/bittbridge.git
 cd bittbridge
 ```
 ### Step 13 – Create Virtual Environment and Install Dependencies
@@ -137,7 +137,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-You should see `(venv)` in your prompt. Always run `source venv/bin/activate` in new terminals/tmux sessions before running miner or validator.
+You should see `(venv)` in your prompt. Always run `source venv/bin/activate` in new terminals/tmux sessions before running the miner.
 
 ### Step 14 – Verify Setup
 
@@ -161,4 +161,4 @@ If both succeed, you're ready for [03 – Wallets and Tokens](03-wallets-and-tok
 
 ---
 
-**Prev:** [01 – Before You Start](01-before-you-start.md) | **Next:** [03 – Wallets and Tokens](03-wallets-and-tokens.md) | [Back to Guide Index](../../README.md#guide)
+[← 1. Before you start](01-before-you-start.md) · **Next:** [3. Wallets and tokens](03-wallets-and-tokens.md) · [Guide](../../README.md#guide)

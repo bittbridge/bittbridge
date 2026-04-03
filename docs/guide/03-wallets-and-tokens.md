@@ -1,12 +1,15 @@
 # 3. Wallets and Tokens
 
-All steps in this section are done **on the GCP VM** (or locally if using [07 – Local Run (Advanced)](07-local-run-advanced.md)).
+All steps in this section are done **on the GCP VM**
 
 ---
 
 ## Create or Import Wallets
 
-You need two wallets: one for the Miner, one for the Validator. Each wallet has a **coldkey** (holds funds) and a **hotkey** (used for mining/validating).
+You only need a **miner** wallet to register and run the moving average miner. 
+
+Wallet has a **coldkey** (holds funds) and a **hotkey** (used for mining or validating).
+(more here - [Bittensor docs on Wallets concepts](https://docs.learnbittensor.org/keys/wallets))
 
 ### Creating New Wallets
 
@@ -16,19 +19,17 @@ To create both coldkey and hotkey for a wallet:
 btcli wallet create
 ```
 
-Example for miner and validator:
+Example for the miner:
 
 ```bash
 # Miner wallet
 btcli wallet create --wallet.name miner --wallet.hotkey default
-
-# Validator wallet
-btcli wallet create --wallet.name validator --wallet.hotkey default
 ```
 
-You will be prompted to set a password for the coldkey and choose mnemonic length. A unique mnemonic is generated for each key (coldkey and hotkey) and shown in the terminal.
+You will be prompted to set a password for the coldkey and choose mnemonic length. 
+A unique mnemonic is generated for each key (coldkey and hotkey) and shown in the terminal.
 
-### Storing Your Mnemonic Phrases – Critical
+### Storing Your Mnemonic Phrases and password/s – Critical
 
 > **Store your mnemonics securely.** You will need them in the future.
 
@@ -38,11 +39,11 @@ You will be prompted to set a password for the coldkey and choose mnemonic lengt
 - **Recovery:** If you lose the wallet files (e.g., VM deleted, disk failure), the mnemonic is the only way to restore your wallet and funds.
 - **No recovery without mnemonic:** Without the mnemonic, lost keys mean permanent loss of access to your TAO.
 
-Write down each mnemonic and keep it in a safe place. You will have **4 mnemonics** total (2 coldkeys + 2 hotkeys for miner and validator).
+Write down each mnemonic and keep it in a safe place. For the miner-only path you have **2 mnemonics** (1 coldkey + 1 hotkey). 
 
 ### Importing Existing Wallets
 
-If you already have wallets from another machine, regenerate them on this VM using the mnemonics:
+If you already have wallets from another machine, regenerate them on this VM using the mnemonics. 
 
 1. **Regenerate coldkey first** (one per wallet):
    ```bash
@@ -81,14 +82,19 @@ btcli w balance --network test
 
 ---
 
-## Register Validator & Miner Hotkeys
+## Register your miner on the subnet
 
 ```bash
 btcli subnet register --netuid 183 --subtensor.network test --wallet.name miner --wallet.hotkey default
-
-btcli subnet register --netuid 183 --subtensor.network test --wallet.name validator --wallet.hotkey default
 ```
 
+**Save your miner UID.** After registration, the CLI shows your **UID** (your index on subnet 183). Write it down or store it somewhere safe — you need it to identify your miner on the network (dashboards, support, grading).
+
+To confirm later:
+
+```bash
+btcli wallet overview --network test
+```
 Optional checks (use wallet/coldkey name, not hotkey name):
 
 ---
@@ -123,12 +129,7 @@ Here's a guide how to do it:
 <img width="806" height="75" alt="Screenshot 2026-03-12 at 12 51 09 PM" src="https://github.com/user-attachments/assets/53670e69-8ba9-4f50-a8c5-d06a120fbdb5" />
 
 
-### WandB (Validators)
-
-- Log in to [Weights & Biases](https://wandb.ai/) and generate an API key.
-- Save it for the next step.
-- Help: [Find your WandB API key](https://docs.wandb.ai/support/find_api_key/)
 
 ---
 
-**Prev:** [02 – GCP VM Setup](02-gcp-vm-setup.md) | **Next:** [04 – Run Miner](04-run-miner.md) | [Back to Guide Index](../../README.md#guide)
+[← 2. GCP VM setup](02-gcp-vm-setup.md) · **Next:** [4. Run miner](04-run-miner.md) · [Guide](../../README.md#guide)

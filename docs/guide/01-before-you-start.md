@@ -2,14 +2,13 @@
 
 ---
 
-## GitHub: fork before you clone
+## What is repo clone?
 
-**Make sure your GitHub workflow is clear before you start.** A common mistake is cloning the upstream repository and trying to push changes there. You work from **your own fork**.
+It is creating a local copy of a remote project (from GitHub) on your computer, including all its files, branches, and full version history
 
-- **Practice first:** Fork [bittbridge/bittbridge](https://github.com/bittbridge/bittbridge), make a small edit, commit, and push to **your** fork.
-- **Never push to upstream main:** Do not push changes to `bittbridge/bittbridge` unless you are a maintainer.
+> **Never push to upstream main:** Do not push changes to `bittbridge/bittbridge` unless you are a maintainer.
 
-You will clone **your fork** on the GCP VM in [02 – GCP VM Setup](02-gcp-vm-setup.md).
+You will use this remote repo clone on the GCP VM in [2. GCP VM setup](02-gcp-vm-setup.md).
 
 ---
 
@@ -32,4 +31,4 @@ Understanding these will help you follow the setup:
 
 ---
 
-**Prev:** — | **Next:** [02 – GCP VM Setup](02-gcp-vm-setup.md) | [Back to Guide Index](../../README.md#guide)
+**Next:** [2. GCP VM setup](02-gcp-vm-setup.md) · [Guide](../../README.md#guide)

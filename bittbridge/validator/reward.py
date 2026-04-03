@@ -18,7 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 """
-Incentive mechanism (see docs/guide/09-incentive-mechanism.md):
+Incentive mechanism (see docs/guide/incentive-mechanism.md):
 - Absolute percentage error: error_i = |prediction_i - actual| / |actual|
 - Score: score_i = exp(-error_i / T), T = median baseline error (calibrated)
 - Per-round weights: weight_i = score_i / sum_j score_j
@@ -32,7 +32,7 @@ from typing import List, Dict, Tuple, Optional
 from bittbridge.protocol import Challenge
 from bittbridge.utils.iso_ne_api import get_load_mw_for_timestamp
 
-# Median percentage error of the 5-hour MA baseline (~9.76% as a fraction). See docs/guide/09-incentive-mechanism.md
+# Median percentage error of the 5-hour MA baseline (~9.76% as a fraction). See docs/guide/incentive-mechanism.md
 INCENTIVE_T = 0.097634
 
 
