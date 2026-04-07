@@ -34,6 +34,8 @@ The default miner uses a simple moving average over recent LoadMw values from th
 
 **Customize the window length (encouraged):** So that different students do not all use identical settings, change the lookback length in `neurons/miner.py`. At the top of the file you will find:
 
+enter ```nano miner.py```
+
 ```python
 # Number of 5-minute steps for moving average (12 = 1 hour)
 N_STEPS = 12
