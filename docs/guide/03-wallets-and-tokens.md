@@ -104,7 +104,7 @@ Optional checks (use wallet/coldkey name, not hotkey name):
 - Sign up at [ISO Express (Create account)](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false).
 - Copy `.env.example` to `.env` and add your username and password (`ISO_NE_USERNAME`, `ISO_NE_PASSWORD`).
 Here's a guide how to do it:
-1) enter ```bash nano .env.example```
+1) enter ```nano .env.example```
   <img width="806" height="602" alt="Screenshot 2026-03-12 at 12 51 14 PM" src="https://github.com/user-attachments/assets/4ef49a49-c893-4233-a4df-1773222542ec" />
 2) enter your username and password you created on ISO-ne
 
