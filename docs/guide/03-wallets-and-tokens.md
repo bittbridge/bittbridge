@@ -48,13 +48,11 @@ If you already have wallets from another machine, regenerate them on this VM usi
 1. **Regenerate coldkey first** (one per wallet):
    ```bash
    btcli wallet regen_coldkey --wallet.name miner --mnemonic "word1 word2 word3 ... word12"
-   btcli wallet regen_coldkey --wallet.name validator --mnemonic "word1 word2 word3 ... word12"
    ```
 
 2. **Regenerate hotkey** (use the coldkey name and hotkey mnemonic):
    ```bash
    btcli wallet regen_hotkey --wallet.name miner --mnemonic "word1 word2 word3 ... word12"
-   btcli wallet regen_hotkey --wallet.name validator --mnemonic "word1 word2 word3 ... word12"
    ```
 
 You must regenerate **both** coldkey and hotkey for each wallet. Use the same wallet names you used originally so commands in this guide work correctly.
