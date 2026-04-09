@@ -3,10 +3,10 @@ data:
   test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
 
 features:
-  use_time_features: true
-  use_cyclical_features: true
-  use_load_lags: true
-  use_load_delta: true
+  use_time_features: false
+  use_cyclical_features: false
+  use_load_lags: false
+  use_load_delta: false
   load_lag_steps: [1, 2, 3, 6, 12]
 
 training:

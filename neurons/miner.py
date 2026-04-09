@@ -34,6 +34,7 @@ from miner_model_energy.pipeline import persist_training_result, train_model
 # Number of 5-minute steps for moving average (12 = 1 hour)
 N_STEPS = 12
 DEFAULT_PARAMS_PATH = "miner_model_energy/model_params.yaml"
+_SECTION_WIDTH = 72
 
 
 @dataclass
@@ -42,10 +43,80 @@ class PreflightResult:
     training_result: object | None = None
 
 
+def _section(title: str) -> None:
+    print()
+    print("=" * _SECTION_WIDTH)
+    print(f"  {title}")
+    print("=" * _SECTION_WIDTH)
+
+
+def _sub(text: str) -> None:
+    print(f"  {text}")
+
+
+def _format_seconds(sec: float) -> str:
+    if sec < 60:
+        return f"{sec:.2f}s"
+    m, s = divmod(sec, 60)
+    if m < 60:
+        return f"{int(m)}m {s:.1f}s"
+    h, m2 = divmod(m, 60)
+    return f"{int(h)}h {int(m2)}m {s:.0f}s"
+
+
+def _print_training_timeline(result) -> None:
+    d = getattr(result, "durations_sec", None) or {}
+    if not d:
+        return
+    _sub("")
+    _sub("Timing")
+    _sub("-" * (_SECTION_WIDTH - 4))
+    if "prepare_data_sec" in d:
+        _sub(f"  Data prep (load + features):     {_format_seconds(d['prepare_data_sec'])}")
+    if "split_and_fit_sec" in d:
+        _sub(f"  Split + train + metrics:         {_format_seconds(d['split_and_fit_sec'])}")
+    if "total_sec" in d:
+        _sub(f"  Total:                           {_format_seconds(d['total_sec'])}")
+
+
+def _print_ml_report(selected_model: str, result) -> None:
+    _section(f"Model: {selected_model}")
+    _sub("")
+    _sub("Tensor shapes")
+    _sub("-" * (_SECTION_WIDTH - 4))
+    _sub(f"  X_train : {result.shapes['X_train']}")
+    _sub(f"  y_train : {result.shapes['y_train']}")
+    _sub(f"  X_val   : {result.shapes['X_val']}")
+    _sub(f"  y_val   : {result.shapes['y_val']}")
+    _sub(f"  X_test  : {result.shapes['X_test']}")
+    _print_training_timeline(result)
+    tr = result.metrics["train"]
+    va = result.metrics["validation"]
+    _sub("")
+    _sub("Train set")
+    _sub("-" * (_SECTION_WIDTH - 4))
+    _sub(
+        f"  RMSE: {tr['rmse']:.3f}    "
+        f"MAE: {tr['mae']:.3f}    "
+        f"MAPE: {tr['mape']:.3f}%    "
+        f"R²: {tr['r2']:.5f}"
+    )
+    _sub("")
+    _sub("Validation set")
+    _sub("-" * (_SECTION_WIDTH - 4))
+    _sub(
+        f"  RMSE: {va['rmse']:.3f}    "
+        f"MAE: {va['mae']:.3f}    "
+        f"MAPE: {va['mape']:.3f}%    "
+        f"R²: {va['r2']:.5f}"
+    )
+    print()
+
+
 def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
     default_hint = "Y/n" if default_yes else "y/N"
     try:
-        answer = input(f"{prompt} [{default_hint}] ").strip().lower()
+        answer = input(f"  {prompt} [{default_hint}] ").strip().lower()
     except EOFError:
         return default_yes
     if not answer:
@@ -55,15 +126,35 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
 
 def _ask_model_type_preflight() -> str:
     try:
-        answer = input("Select advanced model to train (linear/cart/lstm) [linear]: ").strip().lower()
+        answer = input("  Select model (linear / cart / lstm) [linear]: ").strip().lower()
     except EOFError:
         return "linear"
     if not answer:
         return "linear"
     if answer not in {"linear", "cart", "lstm"}:
-        print("Unknown model choice; defaulting to linear.")
+        print("  Unknown choice; defaulting to linear.")
         return "linear"
     return answer
+
+
+def _ask_after_deploy_decline() -> str:
+    """
+    Returns 'baseline' to use moving-average miner, or 'retrain' to pick another advanced model.
+    """
+    _section("Deploy declined — what next?")
+    _sub("  [1]  Continue with baseline moving-average model (default)")
+    _sub("  [2]  Train another advanced model (linear / cart / lstm)")
+    print()
+    try:
+        answer = input("  Choose [1/2]: ").strip().lower()
+    except EOFError:
+        return "baseline"
+    if not answer or answer in ("1", "baseline", "b", "ma"):
+        return "baseline"
+    if answer in ("2", "retrain", "r", "advanced", "train"):
+        return "retrain"
+    print("  Unrecognized choice; defaulting to baseline MA.")
+    return "baseline"
 
 
 def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightResult:
@@ -72,49 +163,55 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
     This ensures no wallet/network/Bittensor objects are touched during setup decisions.
     """
     if non_interactive:
-        print("Non-interactive mode enabled: using baseline moving-average model.")
+        _section("Miner preflight")
+        _sub("Non-interactive mode: using baseline moving-average model.")
+        print()
         return PreflightResult(mode="baseline")
 
+    _section("Miner preflight — model selection")
     if _ask_yes_no_preflight("Run baseline moving-average miner model?", default_yes=True):
+        _sub("")
+        _sub("Starting miner with baseline moving-average predictions.")
+        print()
         return PreflightResult(mode="baseline")
 
-    selected_model = _ask_model_type_preflight()
     try:
         cfg = load_model_config(model_params_path)
-        result = train_model(selected_model, cfg)
-        print(
-            f"[ML] Shapes: "
-            f"X_train={result.shapes['X_train']}, "
-            f"X_val={result.shapes['X_val']}, "
-            f"X_test={result.shapes['X_test']}, "
-            f"y_train={result.shapes['y_train']}, "
-            f"y_val={result.shapes['y_val']}"
-        )
-        print(
-            f"[ML] Train metrics ({selected_model}): "
-            f"RMSE={result.metrics['train']['rmse']:.3f}, "
-            f"MAE={result.metrics['train']['mae']:.3f}, "
-            f"MAPE={result.metrics['train']['mape']:.3f}%, "
-            f"R2={result.metrics['train']['r2']:.5f}"
-        )
-        print(
-            f"[ML] Validation metrics ({selected_model}): "
-            f"RMSE={result.metrics['validation']['rmse']:.3f}, "
-            f"MAE={result.metrics['validation']['mae']:.3f}, "
-            f"MAPE={result.metrics['validation']['mape']:.3f}%, "
-            f"R2={result.metrics['validation']['r2']:.5f}"
-        )
+    except Exception as exc:
+        print(f"  Failed to load model config: {exc}")
+        return PreflightResult(mode="baseline")
+
+    while True:
+        selected_model = _ask_model_type_preflight()
+        try:
+            result = train_model(selected_model, cfg)
+        except Exception as exc:
+            print(f"  Training failed: {exc}")
+            if not _ask_yes_no_preflight("Try a different model?", default_yes=True):
+                print()
+                return PreflightResult(mode="baseline")
+            continue
+
+        _print_ml_report(selected_model, result)
+
         if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
             if cfg.persistence.get("save_on_deploy", True):
                 paths = persist_training_result(result, cfg, run_id="miner")
-                print(f"[ML] Saved model artifacts to: {paths['artifact_dir']}")
-            print(f"Deployed advanced model: {selected_model}")
+                _sub(f"Saved artifacts: {paths['artifact_dir']}")
+            _section("Ready")
+            _sub(f"Deployed advanced model: {selected_model}")
+            print()
             return PreflightResult(mode=f"advanced:{selected_model}", training_result=result)
-        print("Deployment declined; continuing with baseline moving average.")
-        return PreflightResult(mode="baseline")
-    except Exception as exc:
-        print(f"Advanced training flow failed; falling back to baseline: {exc}")
-        return PreflightResult(mode="baseline")
+
+        next_step = _ask_after_deploy_decline()
+        if next_step == "baseline":
+            _section("Ready")
+            _sub("Using baseline moving-average model.")
+            print()
+            return PreflightResult(mode="baseline")
+        # retrain: loop again with new model choice
+        _section("Train another model")
+        _sub("")
 
 
 class Miner(BaseMinerNeuron):

@@ -26,8 +26,12 @@ def main():
     cfg = load_model_config(args.config)
     result = train_model(args.model, cfg)
     one_pred = predict_single_test_row(result)
+    d = result.durations_sec
     print(
         f"model={args.model} "
+        f"total_sec={d.get('total_sec', 0):.3f} "
+        f"prepare_sec={d.get('prepare_data_sec', 0):.3f} "
+        f"fit_sec={d.get('split_and_fit_sec', 0):.3f} "
         f"train_rmse={result.metrics['train']['rmse']:.3f} "
         f"train_mae={result.metrics['train']['mae']:.3f} "
         f"train_mape={result.metrics['train']['mape']:.3f}% "

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -38,6 +39,7 @@ class TrainingResult:
     train_frame: pd.DataFrame
     test_frame: pd.DataFrame
     shapes: Dict[str, Tuple[int, ...]]
+    durations_sec: Dict[str, float] = field(default_factory=dict)
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -78,7 +80,9 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
 
 
 def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
+    t0 = time.perf_counter()
     train_model, test, features = prepare_training_data(config)
+    t1 = time.perf_counter()
     train_split, val_split = temporal_train_val_split(
         train_model, validation_split=config.training["validation_split"]
     )
@@ -112,6 +116,13 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
+    t2 = time.perf_counter()
+    durations_sec = {
+        "prepare_data_sec": t1 - t0,
+        "split_and_fit_sec": t2 - t1,
+        "total_sec": t2 - t0,
+    }
+
     return TrainingResult(
         model_type=model_type,
         model_bundle=bundle,
@@ -129,6 +140,7 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
             "y_train": tuple(y_train.shape),
             "y_val": tuple(y_val.shape),
         },
+        durations_sec=durations_sec,
     )
 
 
@@ -181,6 +193,7 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "feature_signature": feature_signature(result.features),
         "train_rows": int(len(result.train_frame)),
         "metrics": result.metrics,
+        "durations_sec": result.durations_sec,
         "lstm_n_steps": getattr(result.model_bundle, "n_steps", None),
     }
     manifest_path = write_manifest(out_dir, manifest)

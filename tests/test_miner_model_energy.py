@@ -61,7 +61,8 @@ def test_linear_training_and_persistence(tmp_path):
     cfg_path = _write_config(tmp_path, train_path, test_path)
     cfg = load_model_config(str(cfg_path))
     result = train_model("linear", cfg)
-    assert result.metrics["rmse"] >= 0.0
+    assert result.metrics["validation"]["rmse"] >= 0.0
+    assert result.durations_sec.get("total_sec", 0) >= 0
     pred = AdvancedModelPredictor(result).predict("2025-01-01 12:00:00")
     assert isinstance(pred, float)
 
@@ -75,7 +76,7 @@ def test_cart_training(tmp_path):
     cfg_path = _write_config(tmp_path, train_path, test_path)
     cfg = load_model_config(str(cfg_path))
     result = train_model("cart", cfg)
-    assert result.metrics["mae"] >= 0.0
+    assert result.metrics["validation"]["mae"] >= 0.0
 
 
 def test_predictor_router_switch(tmp_path):
