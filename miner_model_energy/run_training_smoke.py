@@ -27,8 +27,15 @@ def main():
     result = train_model(args.model, cfg)
     one_pred = predict_single_test_row(result)
     print(
-        f"model={args.model} rmse={result.metrics['rmse']:.3f} "
-        f"mae={result.metrics['mae']:.3f} mape={result.metrics['mape']:.3f}% "
+        f"model={args.model} "
+        f"train_rmse={result.metrics['train']['rmse']:.3f} "
+        f"train_mae={result.metrics['train']['mae']:.3f} "
+        f"train_mape={result.metrics['train']['mape']:.3f}% "
+        f"train_r2={result.metrics['train']['r2']:.5f} "
+        f"val_rmse={result.metrics['validation']['rmse']:.3f} "
+        f"val_mae={result.metrics['validation']['mae']:.3f} "
+        f"val_mape={result.metrics['validation']['mape']:.3f}% "
+        f"val_r2={result.metrics['validation']['r2']:.5f} "
         f"test_pred={one_pred:.3f}"
     )
 

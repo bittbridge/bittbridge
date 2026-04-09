@@ -9,6 +9,15 @@ from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN
 
 
 DEFAULT_LAGS = [1, 2, 3, 6, 12]
+DEFAULT_EXCLUDE_COLS = {
+    TIMESTAMP_COLUMN,
+    TARGET_COLUMN,
+    "Native Load",
+    "Asset Related Load",
+    "Total Load With Estimated Solar",
+    "Native Load With Estimated Solar",
+    "load_change_1h",
+}
 
 
 def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame:
@@ -32,8 +41,9 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
             out[f"load_lag_{lag}"] = out[TARGET_COLUMN].shift(int(lag))
 
     if feature_cfg.get("use_load_delta", True) and TARGET_COLUMN in out.columns:
-        out["load_delta_1"] = out[TARGET_COLUMN].diff(1)
-        out["load_delta_12"] = out[TARGET_COLUMN].diff(12)
+        # Use only historical information (no current-target leakage).
+        out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
+        out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
 
     return out
 
@@ -55,6 +65,6 @@ def add_test_load_features_from_history(
 
 
 def build_feature_columns(df: pd.DataFrame) -> List[str]:
-    excluded = {TIMESTAMP_COLUMN, TARGET_COLUMN}
+    excluded = set(DEFAULT_EXCLUDE_COLS)
     return [c for c in df.columns if c not in excluded]
 

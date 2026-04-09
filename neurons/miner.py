@@ -83,10 +83,26 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
         cfg = load_model_config(model_params_path)
         result = train_model(selected_model, cfg)
         print(
+            f"[ML] Shapes: "
+            f"X_train={result.shapes['X_train']}, "
+            f"X_val={result.shapes['X_val']}, "
+            f"X_test={result.shapes['X_test']}, "
+            f"y_train={result.shapes['y_train']}, "
+            f"y_val={result.shapes['y_val']}"
+        )
+        print(
+            f"[ML] Train metrics ({selected_model}): "
+            f"RMSE={result.metrics['train']['rmse']:.3f}, "
+            f"MAE={result.metrics['train']['mae']:.3f}, "
+            f"MAPE={result.metrics['train']['mape']:.3f}%, "
+            f"R2={result.metrics['train']['r2']:.5f}"
+        )
+        print(
             f"[ML] Validation metrics ({selected_model}): "
-            f"RMSE={result.metrics['rmse']:.3f}, "
-            f"MAE={result.metrics['mae']:.3f}, "
-            f"MAPE={result.metrics['mape']:.3f}%"
+            f"RMSE={result.metrics['validation']['rmse']:.3f}, "
+            f"MAE={result.metrics['validation']['mae']:.3f}, "
+            f"MAPE={result.metrics['validation']['mape']:.3f}%, "
+            f"R2={result.metrics['validation']['r2']:.5f}"
         )
         if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
             if cfg.persistence.get("save_on_deploy", True):

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from .artifacts import (
     feature_signature,
@@ -33,10 +33,11 @@ from .split import temporal_train_val_split
 class TrainingResult:
     model_type: str
     model_bundle: Any
-    metrics: Dict[str, float]
+    metrics: Dict[str, Dict[str, float]]
     features: List[str]
     train_frame: pd.DataFrame
     test_frame: pd.DataFrame
+    shapes: Dict[str, Tuple[int, ...]]
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -47,7 +48,8 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
     mape = float(np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1e-6, None))) * 100.0)
-    return {"rmse": rmse, "mae": mae, "mape": mape}
+    r2 = float(r2_score(y_true, y_pred))
+    return {"rmse": rmse, "mae": mae, "mape": mape, "r2": r2}
 
 
 def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
@@ -59,14 +61,19 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
     if config.features.get("use_load_lags", True):
         test = add_test_load_features_from_history(test, train, lag_steps=lag_steps)
 
-    train_model = train.dropna().copy()
+    features = build_feature_columns(train)
+    required_train_cols = features + [TARGET_COLUMN]
+    train_model = train.dropna(subset=required_train_cols).reset_index(drop=True)
     if train_model.empty:
         raise ValueError("Training frame is empty after feature engineering and dropna.")
 
-    features = build_feature_columns(train_model)
     missing = [c for c in features if c not in test.columns]
-    for col in missing:
-        test[col] = 0.0
+    if missing:
+        raise ValueError(
+            "Test dataset is missing required feature columns: "
+            + ", ".join(missing[:10])
+            + ("..." if len(missing) > 10 else "")
+        )
     return train_model, test, features
 
 
@@ -79,20 +86,28 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     y_train = train_split[TARGET_COLUMN].to_numpy()
     X_val = _as_numpy(val_split, features)
     y_val = val_split[TARGET_COLUMN].to_numpy()
+    X_test = test[features].astype(float).to_numpy()
 
     if model_type == "linear":
         bundle: LinearBundle = train_linear(X_train, y_train, features, config.models.get("linear", {}))
+        train_pred = predict_linear(bundle, X_train)
         val_pred = predict_linear(bundle, X_val)
     elif model_type == "cart":
         bundle = train_cart(X_train, y_train, features, config.models.get("cart", {}))
+        train_pred = predict_cart(bundle, X_train)
         val_pred = predict_cart(bundle, X_val)
     elif model_type == "lstm":
         bundle = train_lstm(X_train, y_train, features, config.models.get("lstm", {}))
         n_steps = bundle.n_steps
+        X_train_seq, y_train_seq = make_sequences(X_train, y_train, n_steps=n_steps)
         X_val_seq, y_val_seq = make_sequences(X_val, y_val, n_steps=n_steps)
+        if len(X_train_seq) == 0:
+            raise ValueError("Training split too short for LSTM sequence evaluation.")
         if len(X_val_seq) == 0:
             raise ValueError("Validation split too short for LSTM sequence evaluation.")
+        train_pred = predict_lstm(bundle, X_train_seq)
         val_pred = predict_lstm(bundle, X_val_seq)
+        y_train = y_train_seq
         y_val = y_val_seq
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
@@ -100,10 +115,20 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     return TrainingResult(
         model_type=model_type,
         model_bundle=bundle,
-        metrics=_metrics(y_val, val_pred),
+        metrics={
+            "train": _metrics(y_train, train_pred),
+            "validation": _metrics(y_val, val_pred),
+        },
         features=features,
         train_frame=train_model,
         test_frame=test,
+        shapes={
+            "X_train": tuple(X_train.shape),
+            "X_val": tuple(X_val.shape),
+            "X_test": tuple(X_test.shape),
+            "y_train": tuple(y_train.shape),
+            "y_val": tuple(y_val.shape),
+        },
     )
 
 
