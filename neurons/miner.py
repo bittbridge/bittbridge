@@ -1,6 +1,7 @@
 import argparse
 import random
 import time
+from dataclasses import dataclass
 from typing import Optional
 import typing
 import bittensor as bt
@@ -35,6 +36,71 @@ N_STEPS = 12
 DEFAULT_PARAMS_PATH = "miner_model_energy/model_params.yaml"
 
 
+@dataclass
+class PreflightResult:
+    mode: str
+    training_result: object | None = None
+
+
+def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
+    default_hint = "Y/n" if default_yes else "y/N"
+    try:
+        answer = input(f"{prompt} [{default_hint}] ").strip().lower()
+    except EOFError:
+        return default_yes
+    if not answer:
+        return default_yes
+    return answer in {"y", "yes"}
+
+
+def _ask_model_type_preflight() -> str:
+    try:
+        answer = input("Select advanced model to train (linear/cart/lstm) [linear]: ").strip().lower()
+    except EOFError:
+        return "linear"
+    if not answer:
+        return "linear"
+    if answer not in {"linear", "cart", "lstm"}:
+        print("Unknown model choice; defaulting to linear.")
+        return "linear"
+    return answer
+
+
+def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightResult:
+    """
+    Runs all interactive model-selection/training prompts before Miner() is constructed.
+    This ensures no wallet/network/Bittensor objects are touched during setup decisions.
+    """
+    if non_interactive:
+        print("Non-interactive mode enabled: using baseline moving-average model.")
+        return PreflightResult(mode="baseline")
+
+    if _ask_yes_no_preflight("Run baseline moving-average miner model?", default_yes=True):
+        return PreflightResult(mode="baseline")
+
+    selected_model = _ask_model_type_preflight()
+    try:
+        cfg = load_model_config(model_params_path)
+        result = train_model(selected_model, cfg)
+        print(
+            f"[ML] Validation metrics ({selected_model}): "
+            f"RMSE={result.metrics['rmse']:.3f}, "
+            f"MAE={result.metrics['mae']:.3f}, "
+            f"MAPE={result.metrics['mape']:.3f}%"
+        )
+        if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
+            if cfg.persistence.get("save_on_deploy", True):
+                paths = persist_training_result(result, cfg, run_id="miner")
+                print(f"[ML] Saved model artifacts to: {paths['artifact_dir']}")
+            print(f"Deployed advanced model: {selected_model}")
+            return PreflightResult(mode=f"advanced:{selected_model}", training_result=result)
+        print("Deployment declined; continuing with baseline moving average.")
+        return PreflightResult(mode="baseline")
+    except Exception as exc:
+        print(f"Advanced training flow failed; falling back to baseline: {exc}")
+        return PreflightResult(mode="baseline")
+
+
 class Miner(BaseMinerNeuron):
     """
     Miner neuron for New England energy demand (LoadMw) prediction.
@@ -63,65 +129,16 @@ class Miner(BaseMinerNeuron):
             help="Disable terminal prompts and keep baseline MA model.",
         )
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, preflight_result: PreflightResult | None = None):
         super(Miner, self).__init__(config=config)
         self._add_test_noise = getattr(self.config, "test", False)
         self.predictor_router = PredictorRouter(BaselineMovingAveragePredictor(N_STEPS))
-        self._maybe_setup_advanced_model()
-
-    def _ask_yes_no(self, prompt: str, default_yes: bool) -> bool:
-        default_hint = "Y/n" if default_yes else "y/N"
-        try:
-            answer = input(f"{prompt} [{default_hint}] ").strip().lower()
-        except EOFError:
-            bt.logging.warning("Input unavailable; using default prompt answer.")
-            return default_yes
-        if not answer:
-            return default_yes
-        return answer in {"y", "yes"}
-
-    def _ask_model_type(self) -> str:
-        try:
-            answer = input("Select advanced model to train (linear/cart/lstm) [linear]: ").strip().lower()
-        except EOFError:
-            bt.logging.warning("Input unavailable; defaulting to linear model.")
-            return "linear"
-        if not answer:
-            return "linear"
-        if answer not in {"linear", "cart", "lstm"}:
-            bt.logging.warning("Unknown model choice; defaulting to linear.")
-            return "linear"
-        return answer
-
-    def _maybe_setup_advanced_model(self) -> None:
-        if getattr(self.config.miner, "non_interactive", False):
-            bt.logging.info("Non-interactive mode enabled: using baseline moving-average model.")
-            return
-
-        if not self._ask_yes_no("Run baseline moving-average miner model?", default_yes=True):
-            selected_model = self._ask_model_type()
-            params_path = getattr(self.config.miner, "model_params_path", DEFAULT_PARAMS_PATH)
-            try:
-                cfg = load_model_config(params_path)
-                result = train_model(selected_model, cfg)
-                bt.logging.info(
-                    f"[ML] Validation metrics ({selected_model}): "
-                    f"RMSE={result.metrics['rmse']:.3f}, "
-                    f"MAE={result.metrics['mae']:.3f}, "
-                    f"MAPE={result.metrics['mape']:.3f}%"
-                )
-                if self._ask_yes_no("Deploy this trained model?", default_yes=False):
-                    if cfg.persistence.get("save_on_deploy", True):
-                        paths = persist_training_result(result, cfg, run_id="miner")
-                        bt.logging.info(f"[ML] Saved model artifacts to: {paths['artifact_dir']}")
-                    self.predictor_router.set_predictor(
-                        AdvancedModelPredictor(result=result), mode=f"advanced:{selected_model}"
-                    )
-                    bt.logging.success(f"Deployed advanced model: {selected_model}")
-                else:
-                    bt.logging.info("Deployment declined; continuing with baseline moving average.")
-            except Exception as exc:
-                bt.logging.error(f"Advanced training flow failed; falling back to baseline: {exc}")
+        if preflight_result and preflight_result.training_result is not None:
+            self.predictor_router.set_predictor(
+                AdvancedModelPredictor(result=preflight_result.training_result),
+                mode=preflight_result.mode,
+            )
+            bt.logging.success(f"Using preflight-deployed model mode: {preflight_result.mode}")
 
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
@@ -202,8 +219,29 @@ class Miner(BaseMinerNeuron):
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
     from dotenv import load_dotenv
+
     load_dotenv()
-    with Miner() as miner:
+
+    preflight_arg_parser = argparse.ArgumentParser(add_help=False)
+    preflight_arg_parser.add_argument(
+        "--miner.model_params_path",
+        dest="model_params_path",
+        type=str,
+        default=DEFAULT_PARAMS_PATH,
+    )
+    preflight_arg_parser.add_argument(
+        "--miner.non_interactive",
+        dest="non_interactive",
+        action="store_true",
+        default=False,
+    )
+    preflight_args, _ = preflight_arg_parser.parse_known_args()
+    preflight_result = run_preflight(
+        model_params_path=preflight_args.model_params_path,
+        non_interactive=preflight_args.non_interactive,
+    )
+
+    with Miner(preflight_result=preflight_result) as miner:
         while True:
             bt.logging.info(f"Miner running... {time.time()}")
             time.sleep(5)
