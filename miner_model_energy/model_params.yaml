@@ -1,0 +1,37 @@
+data:
+  train_csv: miner_model_energy/TRAIN-updated-train-data_3-25-26.csv
+  test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
+
+features:
+  use_time_features: true
+  use_cyclical_features: true
+  use_load_lags: true
+  use_load_delta: true
+  load_lag_steps: [1, 2, 3, 6, 12]
+
+training:
+  selected_model: linear
+  validation_split: 0.2
+
+models:
+  enabled:
+    linear: true
+    cart: true
+    lstm: false
+  linear:
+    fit_intercept: true
+  cart:
+    max_depth: 6
+    min_samples_split: 10
+    min_samples_leaf: 5
+  lstm:
+    n_steps: 12
+    units: 32
+    dropout: 0.1
+    epochs: 5
+    batch_size: 64
+
+persistence:
+  artifact_dir: miner_model_energy/artifacts
+  save_on_deploy: true
+

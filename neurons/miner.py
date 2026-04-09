@@ -1,8 +1,6 @@
 import argparse
-import os
 import random
 import time
-from datetime import datetime, timedelta
 from typing import Optional
 import typing
 import bittensor as bt
@@ -12,8 +10,13 @@ import bittbridge
 
 # import base miner class which takes care of most of the boilerplate
 from bittbridge.base.miner import BaseMinerNeuron
-from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
-from bittbridge.utils.timestamp import get_now
+from miner_model_energy.inference_runtime import (
+    AdvancedModelPredictor,
+    BaselineMovingAveragePredictor,
+    PredictorRouter,
+)
+from miner_model_energy.ml_config import load_model_config
+from miner_model_energy.pipeline import persist_training_result, train_model
 
 # ---------------------------
 # Miner Forward Logic for New England Energy Demand (LoadMw) Prediction
@@ -29,37 +32,7 @@ from bittbridge.utils.timestamp import get_now
 
 # Number of 5-minute steps for moving average (12 = 1 hour)
 N_STEPS = 12
-
-
-def get_latest_load_mw_values(n_steps: int = N_STEPS) -> Optional[list]:
-    """
-    Fetch latest N LoadMw values from ISO-NE API.
-    get_now() is Eastern; API day is Eastern.
-    """
-    now = get_now()
-    today = now.strftime("%Y%m%d")
-    data = fetch_fiveminute_system_load(today, use_cache=False)
-    # If first hour of Eastern day, also fetch yesterday for enough data
-    if now.hour < 1 and now.minute < 30:
-        yesterday = (now - timedelta(days=1)).strftime("%Y%m%d")
-        data_yesterday = fetch_fiveminute_system_load(yesterday, use_cache=False)
-        data = data_yesterday + data
-    if not data:
-        return None
-    load_values = [load_mw for _, load_mw in data]
-    if len(load_values) < n_steps:
-        return None
-    return load_values[-n_steps:]
-
-
-def predict_next_load_ma(load_values: list, n_steps: int = N_STEPS) -> Optional[float]:
-    """
-    Predict next LoadMw using simple moving average of last n_steps values.
-    """
-    if not load_values or len(load_values) < n_steps:
-        return None
-    recent = load_values[-n_steps:]
-    return float(sum(recent) / len(recent))
+DEFAULT_PARAMS_PATH = "miner_model_energy/model_params.yaml"
 
 
 class Miner(BaseMinerNeuron):
@@ -77,24 +50,85 @@ class Miner(BaseMinerNeuron):
             help="[Testing only] Add random noise to each prediction so multiple miners produce different values (e.g. for dashboard development).",
             default=False,
         )
+        parser.add_argument(
+            "--miner.model_params_path",
+            type=str,
+            default=DEFAULT_PARAMS_PATH,
+            help="Path to model YAML config used for advanced training.",
+        )
+        parser.add_argument(
+            "--miner.non_interactive",
+            action="store_true",
+            default=False,
+            help="Disable terminal prompts and keep baseline MA model.",
+        )
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
         self._add_test_noise = getattr(self.config, "test", False)
+        self.predictor_router = PredictorRouter(BaselineMovingAveragePredictor(N_STEPS))
+        self._maybe_setup_advanced_model()
+
+    def _ask_yes_no(self, prompt: str, default_yes: bool) -> bool:
+        default_hint = "Y/n" if default_yes else "y/N"
+        try:
+            answer = input(f"{prompt} [{default_hint}] ").strip().lower()
+        except EOFError:
+            bt.logging.warning("Input unavailable; using default prompt answer.")
+            return default_yes
+        if not answer:
+            return default_yes
+        return answer in {"y", "yes"}
+
+    def _ask_model_type(self) -> str:
+        try:
+            answer = input("Select advanced model to train (linear/cart/lstm) [linear]: ").strip().lower()
+        except EOFError:
+            bt.logging.warning("Input unavailable; defaulting to linear model.")
+            return "linear"
+        if not answer:
+            return "linear"
+        if answer not in {"linear", "cart", "lstm"}:
+            bt.logging.warning("Unknown model choice; defaulting to linear.")
+            return "linear"
+        return answer
+
+    def _maybe_setup_advanced_model(self) -> None:
+        if getattr(self.config.miner, "non_interactive", False):
+            bt.logging.info("Non-interactive mode enabled: using baseline moving-average model.")
+            return
+
+        if not self._ask_yes_no("Run baseline moving-average miner model?", default_yes=True):
+            selected_model = self._ask_model_type()
+            params_path = getattr(self.config.miner, "model_params_path", DEFAULT_PARAMS_PATH)
+            try:
+                cfg = load_model_config(params_path)
+                result = train_model(selected_model, cfg)
+                bt.logging.info(
+                    f"[ML] Validation metrics ({selected_model}): "
+                    f"RMSE={result.metrics['rmse']:.3f}, "
+                    f"MAE={result.metrics['mae']:.3f}, "
+                    f"MAPE={result.metrics['mape']:.3f}%"
+                )
+                if self._ask_yes_no("Deploy this trained model?", default_yes=False):
+                    if cfg.persistence.get("save_on_deploy", True):
+                        paths = persist_training_result(result, cfg, run_id="miner")
+                        bt.logging.info(f"[ML] Saved model artifacts to: {paths['artifact_dir']}")
+                    self.predictor_router.set_predictor(
+                        AdvancedModelPredictor(result=result), mode=f"advanced:{selected_model}"
+                    )
+                    bt.logging.success(f"Deployed advanced model: {selected_model}")
+                else:
+                    bt.logging.info("Deployment declined; continuing with baseline moving average.")
+            except Exception as exc:
+                bt.logging.error(f"Advanced training flow failed; falling back to baseline: {exc}")
 
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
         Responds to the Challenge synapse from the validator with a LoadMw point prediction
         (moving average of recent 5-min system load).
         """
-        # Step 1: Fetch latest LoadMw data from API
-        load_values = get_latest_load_mw_values(n_steps=N_STEPS)
-        if load_values is None:
-            bt.logging.warning("Failed to fetch LoadMw data from API - skipping this round")
-            return synapse
-
-        # Step 2: Predict next LoadMw using moving average
-        prediction = predict_next_load_ma(load_values, n_steps=N_STEPS)
+        prediction = self.predictor_router.predict(synapse.timestamp)
         if prediction is None:
             return synapse
 
@@ -113,7 +147,7 @@ class Miner(BaseMinerNeuron):
             )
         else:
             bt.logging.success(
-                f"Predicting LoadMw for timestamp={synapse.timestamp}: {prediction:.1f}"
+                f"[{self.predictor_router.mode}] Predicting LoadMw for timestamp={synapse.timestamp}: {prediction:.1f}"
             )
         return synapse
 

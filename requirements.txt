@@ -12,3 +12,6 @@ bittensor-cli>=7.0.0
 wandb>=0.18
 pytz>=2025.2
 scikit-learn>=1.3.0
+PyYAML>=6.0.0
+joblib>=1.3.0
+tensorflow>=2.16.0
