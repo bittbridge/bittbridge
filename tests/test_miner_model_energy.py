@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Allow `python tests/test_miner_model_energy.py` and pytest without installing the package.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -171,3 +179,7 @@ def test_lstm_runs_with_feature_patch(tmp_path):
     cfg = load_model_config(str(cfg_path))
     result = train_model("lstm", cfg)
     assert result.metrics["validation"]["rmse"] >= 0.0
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))

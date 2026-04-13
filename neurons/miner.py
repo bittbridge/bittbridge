@@ -126,7 +126,7 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
 
 def _ask_model_type_preflight() -> str:
     try:
-        answer = input("  Select model (linear / cart / lstm) [linear]: ").strip().lower()
+        answer = input("  Select model (linear / cart / lstm): ").strip().lower()
     except EOFError:
         return "linear"
     if not answer:

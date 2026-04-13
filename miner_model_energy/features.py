@@ -31,6 +31,16 @@ def _weather_column_groups(columns: Sequence[str]) -> Tuple[List[str], ...]:
     return tmpf, dwpf, relh, sped, drct
 
 
+def _row_std_across_stations(frame: pd.DataFrame) -> pd.Series:
+    """
+    Std across station columns per row. With a single column, pandas std(ddof=1) is NaN;
+    real deployments often have one RELH/SPED column, so use 0.0 in that case.
+    """
+    if frame.shape[1] < 2:
+        return pd.Series(0.0, index=frame.index, dtype=float)
+    return frame.std(axis=1, ddof=0)
+
+
 def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame:
     """
     Feature families mirror manual notebook setup.
@@ -57,15 +67,15 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
     if feature_cfg.get("use_station_agg_features", False):
         if tmpf_cols:
             out["tmpf_mean"] = out[tmpf_cols].mean(axis=1)
-            out["tmpf_std"] = out[tmpf_cols].std(axis=1)
+            out["tmpf_std"] = _row_std_across_stations(out[tmpf_cols])
             out["tmpf_min"] = out[tmpf_cols].min(axis=1)
             out["tmpf_max"] = out[tmpf_cols].max(axis=1)
         if relh_cols:
             out["relh_mean"] = out[relh_cols].mean(axis=1)
-            out["relh_std"] = out[relh_cols].std(axis=1)
+            out["relh_std"] = _row_std_across_stations(out[relh_cols])
         if sped_cols:
             out["sped_mean"] = out[sped_cols].mean(axis=1)
-            out["sped_std"] = out[sped_cols].std(axis=1)
+            out["sped_std"] = _row_std_across_stations(out[sped_cols])
             out["sped_max"] = out[sped_cols].max(axis=1)
 
     if feature_cfg.get("use_temp_dew_gap", False) and tmpf_cols and dwpf_cols:
@@ -80,7 +90,7 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
                 gap_cols.append(name)
         if gap_cols:
             out["temp_dew_gap_mean"] = out[gap_cols].mean(axis=1)
-            out["temp_dew_gap_std"] = out[gap_cols].std(axis=1)
+            out["temp_dew_gap_std"] = _row_std_across_stations(out[gap_cols])
 
     if feature_cfg.get("use_wind_vector_features", False) and drct_cols:
         wind_x_cols: List[str] = []
