@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -45,7 +45,35 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
         out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
         out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
 
+    _drop_features_disabled_by_config(out, feature_cfg)
     return out
+
+
+def _drop_features_disabled_by_config(out: pd.DataFrame, feature_cfg: Dict) -> None:
+    """
+    TRAIN CSV may include raw columns (e.g. hour, month) while TEST may not.
+    If a toggle is off, remove those columns so train/test schemas stay aligned
+    with what we actually intend to use (same as notebook intent when flags are off).
+    """
+    if not feature_cfg.get("use_time_features", True):
+        for col in ("hour", "month", "day_of_week"):
+            if col in out.columns:
+                out.drop(columns=[col], inplace=True)
+
+    if not feature_cfg.get("use_cyclical_features", True):
+        for col in ("hour_sin", "hour_cos", "dow_sin", "dow_cos"):
+            if col in out.columns:
+                out.drop(columns=[col], inplace=True)
+
+    if not feature_cfg.get("use_load_lags", True):
+        to_drop = [c for c in out.columns if str(c).startswith("load_lag_")]
+        if to_drop:
+            out.drop(columns=to_drop, inplace=True)
+
+    if not feature_cfg.get("use_load_delta", True):
+        for col in ("load_delta_1", "load_delta_12"):
+            if col in out.columns:
+                out.drop(columns=[col], inplace=True)
 
 
 def add_test_load_features_from_history(
@@ -64,7 +92,15 @@ def add_test_load_features_from_history(
     return out
 
 
-def build_feature_columns(df: pd.DataFrame) -> List[str]:
+def build_feature_columns(train: pd.DataFrame, test: Optional[pd.DataFrame] = None) -> List[str]:
+    """
+    Feature list = non-excluded columns on train. If test is given, keep only columns
+    that exist on both train and test so inference rows never require missing columns.
+    """
     excluded = set(DEFAULT_EXCLUDE_COLS)
-    return [c for c in df.columns if c not in excluded]
+    feats = [c for c in train.columns if c not in excluded]
+    if test is not None:
+        test_cols = set(test.columns)
+        feats = [c for c in feats if c in test_cols]
+    return feats
 

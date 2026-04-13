@@ -34,4 +34,3 @@ models:
 persistence:
   artifact_dir: miner_model_energy/artifacts
   save_on_deploy: true
-

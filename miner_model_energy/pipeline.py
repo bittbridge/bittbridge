@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -63,19 +64,27 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
     if config.features.get("use_load_lags", True):
         test = add_test_load_features_from_history(test, train, lag_steps=lag_steps)
 
-    features = build_feature_columns(train)
+    train_only = build_feature_columns(train, test=None)
+    features = build_feature_columns(train, test=test)
+    dropped = sorted(set(train_only) - set(features))
+    if dropped:
+        warnings.warn(
+            "Train CSV has columns that TEST does not; those columns are excluded so "
+            "train and inference use the same feature set. Omitted: "
+            + ", ".join(dropped[:25])
+            + (" ..." if len(dropped) > 25 else ""),
+            UserWarning,
+            stacklevel=2,
+        )
+    if not features:
+        raise ValueError(
+            "No shared feature columns between train and test after exclusions. "
+            "Check model_params.yaml toggles and CSV schemas."
+        )
     required_train_cols = features + [TARGET_COLUMN]
     train_model = train.dropna(subset=required_train_cols).reset_index(drop=True)
     if train_model.empty:
         raise ValueError("Training frame is empty after feature engineering and dropna.")
-
-    missing = [c for c in features if c not in test.columns]
-    if missing:
-        raise ValueError(
-            "Test dataset is missing required feature columns: "
-            + ", ".join(missing[:10])
-            + ("..." if len(missing) > 10 else "")
-        )
     return train_model, test, features
 
 
@@ -144,6 +153,30 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     )
 
 
+def build_lstm_inference_matrix(result: TrainingResult) -> np.ndarray:
+    """
+    LSTM needs shape (n_steps, n_features). TEST often has one row; prepend the last
+    (n_steps - 1) rows from train so the window matches training-time sequences.
+    """
+    bundle = result.model_bundle
+    n_steps = int(bundle.n_steps)
+    feats = result.features
+    train_x = result.train_frame[feats].astype(float).to_numpy()
+    test_x = result.test_frame[feats].astype(float).to_numpy()
+
+    if test_x.shape[0] >= n_steps:
+        return test_x[-n_steps:]
+
+    need_prior = n_steps - test_x.shape[0]
+    if train_x.shape[0] < need_prior:
+        raise ValueError(
+            f"LSTM inference needs {need_prior} prior timestep(s) from training history; "
+            f"train_frame has only {train_x.shape[0]} row(s)."
+        )
+    prior = train_x[-need_prior:]
+    return np.vstack([prior, test_x])
+
+
 def predict_single_test_row(result: TrainingResult) -> float:
     X_test = result.test_frame[result.features].astype(float).to_numpy()
     if result.model_type == "linear":
@@ -151,7 +184,8 @@ def predict_single_test_row(result: TrainingResult) -> float:
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, X_test)[0]
     elif result.model_type == "lstm":
-        pred = predict_lstm(result.model_bundle, X_test)[0]
+        seq_2d = build_lstm_inference_matrix(result)
+        pred = predict_lstm(result.model_bundle, seq_2d)[0]
     else:
         raise ValueError(f"Unsupported model type: {result.model_type}")
     return float(pred)

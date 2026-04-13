@@ -57,9 +57,13 @@ def train_lstm(X_train: np.ndarray, y_train: np.ndarray, features: List[str], cf
 
 
 def predict_lstm(bundle: LstmBundle, X: np.ndarray) -> np.ndarray:
+    """X is (n_steps, n_features) or longer 2D; or already (1, n_steps, n_features)."""
     if X.ndim == 2:
         if len(X) < bundle.n_steps:
-            raise ValueError("Need at least n_steps rows to build LSTM inference sequence.")
+            raise ValueError(
+                "Need at least n_steps rows to build LSTM inference sequence. "
+                "For a single test row, build a window from train history + test row."
+            )
         X = X[-bundle.n_steps :][np.newaxis, :, :]
     preds = bundle.model.predict(X, verbose=0)
     return preds.reshape(-1)
