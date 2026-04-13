@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import yaml
 
@@ -16,11 +16,34 @@ class ModelConfig:
     persistence: Dict[str, Any]
 
 
+FEATURE_BOOL_KEYS = (
+    "use_time_features",
+    "use_cyclical_features",
+    "use_station_agg_features",
+    "use_temp_dew_gap",
+    "use_wind_vector_features",
+    "use_load_lags",
+    "use_load_rolling",
+    "use_load_delta",
+)
+
+
 def _require_path(path_value: str, key: str) -> str:
     path = Path(path_value)
     if not path.exists():
         raise ValueError(f"Config `{key}` points to missing path: {path}")
     return str(path)
+
+
+def _as_int_list(value: Any, key: str, default: List[int]) -> List[int]:
+    if value is None:
+        return list(default)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"`{key}` must be a non-empty list of integers.")
+    out: List[int] = []
+    for item in value:
+        out.append(int(item))
+    return out
 
 
 def load_model_config(path: str) -> ModelConfig:
@@ -47,13 +70,21 @@ def load_model_config(path: str) -> ModelConfig:
         raise ValueError("`training.validation_split` must be between 0 and 0.5.")
     training["validation_split"] = validation_split
 
-    for key in (
-        "use_time_features",
-        "use_cyclical_features",
-        "use_load_lags",
-        "use_load_delta",
-    ):
-        features[key] = bool(features.get(key, True))
+    training["random_state"] = int(training.get("random_state", 42))
+
+    for key in FEATURE_BOOL_KEYS:
+        features[key] = bool(features.get(key, False))
+
+    default_lags = [1, 2, 3, 6, 12]
+    default_rolling = [3, 6, 12, 24]
+    features["load_lag_steps"] = _as_int_list(
+        features.get("load_lag_steps"), "features.load_lag_steps", default_lags
+    )
+    features["rolling_load_windows"] = _as_int_list(
+        features.get("rolling_load_windows"),
+        "features.rolling_load_windows",
+        default_rolling,
+    )
 
     artifact_dir = persistence.get("artifact_dir", "miner_model_energy/artifacts")
     persistence["artifact_dir"] = str(Path(artifact_dir))
@@ -66,4 +97,3 @@ def load_model_config(path: str) -> ModelConfig:
         models=models,
         persistence=persistence,
     )
-

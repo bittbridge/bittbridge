@@ -32,7 +32,24 @@ def make_sequences(X: np.ndarray, y: np.ndarray, n_steps: int) -> Tuple[np.ndarr
     return np.asarray(X_seq), np.asarray(y_seq)
 
 
-def train_lstm(X_train: np.ndarray, y_train: np.ndarray, features: List[str], cfg: Dict) -> LstmBundle:
+def _set_random_seeds(seed: int) -> None:
+    np.random.seed(seed)
+    try:
+        import tensorflow as tf
+
+        tf.random.set_seed(seed)
+    except Exception:
+        pass
+
+
+def train_lstm(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    features: List[str],
+    cfg: Dict,
+    random_state: int = 42,
+) -> LstmBundle:
+    _set_random_seeds(int(random_state))
     Sequential, LSTM, Dense, Dropout = _require_keras()
     n_steps = int(cfg.get("n_steps", 12))
     X_seq, y_seq = make_sequences(X_train, y_train, n_steps=n_steps)

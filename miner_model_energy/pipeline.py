@@ -60,9 +60,13 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
     train = add_engineered_features(train, config.features)
     test = add_engineered_features(test, config.features)
 
-    lag_steps = config.features.get("load_lag_steps", [1, 2, 3, 6, 12])
-    if config.features.get("use_load_lags", True):
-        test = add_test_load_features_from_history(test, train, lag_steps=lag_steps)
+    feats_cfg = config.features
+    if (
+        feats_cfg.get("use_load_lags", False)
+        or feats_cfg.get("use_load_rolling", False)
+        or feats_cfg.get("use_load_delta", False)
+    ):
+        test = add_test_load_features_from_history(test, train, feats_cfg)
 
     train_only = build_feature_columns(train, test=None)
     features = build_feature_columns(train, test=test)
@@ -101,16 +105,19 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     y_val = val_split[TARGET_COLUMN].to_numpy()
     X_test = test[features].astype(float).to_numpy()
 
+    rs = int(config.training.get("random_state", 42))
     if model_type == "linear":
         bundle: LinearBundle = train_linear(X_train, y_train, features, config.models.get("linear", {}))
         train_pred = predict_linear(bundle, X_train)
         val_pred = predict_linear(bundle, X_val)
     elif model_type == "cart":
-        bundle = train_cart(X_train, y_train, features, config.models.get("cart", {}))
+        cart_cfg = dict(config.models.get("cart", {}))
+        cart_cfg.setdefault("random_state", rs)
+        bundle = train_cart(X_train, y_train, features, cart_cfg)
         train_pred = predict_cart(bundle, X_train)
         val_pred = predict_cart(bundle, X_val)
     elif model_type == "lstm":
-        bundle = train_lstm(X_train, y_train, features, config.models.get("lstm", {}))
+        bundle = train_lstm(X_train, y_train, features, config.models.get("lstm", {}), random_state=rs)
         n_steps = bundle.n_steps
         X_train_seq, y_train_seq = make_sequences(X_train, y_train, n_steps=n_steps)
         X_val_seq, y_val_seq = make_sequences(X_val, y_val, n_steps=n_steps)

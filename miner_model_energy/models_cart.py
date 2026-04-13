@@ -19,7 +19,7 @@ def train_cart(X_train: np.ndarray, y_train: np.ndarray, features: List[str], cf
         max_depth=cfg.get("max_depth", 6),
         min_samples_split=cfg.get("min_samples_split", 10),
         min_samples_leaf=cfg.get("min_samples_leaf", 5),
-        random_state=42,
+        random_state=int(cfg.get("random_state", 42)),
     )
     model.fit(X_train, y_train)
     return CartBundle(model=model, features=features)
