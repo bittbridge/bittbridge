@@ -7,6 +7,8 @@ import pandas as pd
 
 from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN
 
+# Raw ISO-NE-style columns are named "<station>-<suffix>". Used for optional whitelist filtering.
+KNOWN_WEATHER_SUFFIXES = frozenset({"tmpf", "dwpf", "relh", "sped", "drct"})
 
 DEFAULT_LAGS = [1, 2]
 DEFAULT_ROLLING_WINDOWS = [3, 6]
@@ -19,6 +21,52 @@ DEFAULT_EXCLUDE_COLS = {
     "Native Load With Estimated Solar",
     "load_change_1h",
 }
+
+
+def filter_weather_suffix_columns(
+    df: pd.DataFrame, include_suffixes: Optional[Sequence[str]]
+) -> pd.DataFrame:
+    """
+    Raw ISO columns look like ``BDL-tmpf`` (suffix in :data:`KNOWN_WEATHER_SUFFIXES`).
+
+    * **Empty or None** (default in YAML): drop **all** such raw weather columns so only
+      ``dt``, ``Total Load``, and other non-weather columns remain unless you enable
+      engineered features (time, lags, etc.).
+    * **Non-empty list**: keep only the listed suffix groups (whitelist); drop other
+      known weather suffixes.
+    """
+    if include_suffixes is None:
+        include_suffixes = []
+    allowed = frozenset(str(s).strip().lower() for s in include_suffixes if str(s).strip())
+
+    if not allowed:
+        to_drop: List[str] = []
+        for col in df.columns:
+            name = str(col)
+            if "-" not in name:
+                continue
+            suffix = name.rsplit("-", 1)[-1].lower()
+            if suffix in KNOWN_WEATHER_SUFFIXES:
+                to_drop.append(col)
+        return df.drop(columns=to_drop) if to_drop else df
+
+    unknown = allowed - KNOWN_WEATHER_SUFFIXES
+    if unknown:
+        raise ValueError(
+            f"Unknown weather column suffix(es): {sorted(unknown)}. "
+            f"Allowed: {sorted(KNOWN_WEATHER_SUFFIXES)}."
+        )
+    to_drop = []
+    for col in df.columns:
+        name = str(col)
+        if "-" not in name:
+            continue
+        suffix = name.rsplit("-", 1)[-1].lower()
+        if suffix in KNOWN_WEATHER_SUFFIXES and suffix not in allowed:
+            to_drop.append(col)
+    if not to_drop:
+        return df
+    return df.drop(columns=to_drop)
 
 
 def _weather_column_groups(columns: Sequence[str]) -> Tuple[List[str], ...]:

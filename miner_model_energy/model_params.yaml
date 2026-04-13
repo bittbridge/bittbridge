@@ -30,8 +30,14 @@ features:
 
   # Standalone load_delta_1 and load_delta_12 when use_load_rolling is false.
   use_load_delta: false
-  load_lag_steps: [1, 2]
+  load_lag_steps: [24]
   rolling_load_windows: [3, 6]
+
+  # Raw per-station weather columns (e.g. "BDL-tmpf"). Empty = drop ALL of these (default).
+  # tmpf = air temperature (°F), dwpf = dewpoint, relh = relative humidity,
+  # sped = wind speed, drct = wind direction (degrees).
+  # To use every group: [tmpf, dwpf, relh, sped, drct]
+  include_weather_suffix_groups: []
 
 # validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART and LSTM.
 training:

@@ -142,19 +142,22 @@ def _ask_after_deploy_decline() -> str:
     Returns 'baseline' to use moving-average miner, or 'retrain' to pick another advanced model.
     """
     _section("Deploy declined — what next?")
-    _sub("  [1]  Continue with baseline moving-average model (default)")
+    _sub("  [1]  Continue with baseline moving-average model")
     _sub("  [2]  Train another advanced model (linear / cart / lstm)")
     print()
-    try:
-        answer = input("  Choose [1/2]: ").strip().lower()
-    except EOFError:
-        return "baseline"
-    if not answer or answer in ("1", "baseline", "b", "ma"):
-        return "baseline"
-    if answer in ("2", "retrain", "r", "advanced", "train"):
-        return "retrain"
-    print("  Unrecognized choice; defaulting to baseline MA.")
-    return "baseline"
+    while True:
+        try:
+            answer = input("  Choose [1/2]: ").strip().lower()
+        except EOFError:
+            return "baseline"
+        if answer in ("1", "baseline", "b", "ma"):
+            return "baseline"
+        if answer in ("2", "retrain", "r", "advanced", "train"):
+            return "retrain"
+        if not answer:
+            print("  Please enter 1 or 2.")
+            continue
+        print("  Unrecognized choice. Enter 1 for baseline MA or 2 to train another model.")
 
 
 def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightResult:

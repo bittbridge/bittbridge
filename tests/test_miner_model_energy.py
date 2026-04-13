@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from miner_model_energy.artifacts import load_manifest
+from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import load_model_config
 from miner_model_energy.pipeline import persist_training_result, predict_single_test_row, train_model
@@ -58,6 +59,8 @@ def _default_features():
         "use_load_delta": False,
         "load_lag_steps": [1, 2, 3],
         "rolling_load_windows": [3, 6, 12],
+        # Whitelist all raw weather columns so parametrize cases match pre-filter behavior.
+        "include_weather_suffix_groups": sorted(KNOWN_WEATHER_SUFFIXES),
     }
 
 
@@ -166,6 +169,54 @@ def test_predictor_router_switch(tmp_path):
     router.set_predictor(AdvancedModelPredictor(result), mode="advanced:linear")
     value = router.predict("2025-01-01 12:00:00")
     assert isinstance(value, float)
+
+
+def test_empty_weather_whitelist_drops_raw_columns(tmp_path):
+    """Default YAML semantics: [] removes *-tmpf etc.; need engineered features to train."""
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"include_weather_suffix_groups": [], "use_time_features": True},
+    )
+    cfg = load_model_config(str(cfg_path))
+    result = train_model("linear", cfg)
+    assert "4B8-tmpf" not in result.train_frame.columns
+    assert "hour" in result.train_frame.columns
+    assert result.metrics["validation"]["rmse"] >= 0.0
+
+
+def test_linear_with_weather_suffix_whitelist(tmp_path):
+    """Only *-tmpf and *-dwpf raw columns kept; training still completes."""
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"include_weather_suffix_groups": ["tmpf", "dwpf"], "use_station_agg_features": True},
+    )
+    cfg = load_model_config(str(cfg_path))
+    result = train_model("linear", cfg)
+    assert "4B8-drct" not in result.train_frame.columns
+    assert result.metrics["validation"]["rmse"] >= 0.0
+
+
+def test_load_config_rejects_unknown_weather_suffix(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    bad = _default_features()
+    bad["include_weather_suffix_groups"] = ["tmpf", "not_a_real_suffix"]
+    cfg = {
+        "data": {"train_csv": str(train_path), "test_csv": str(test_path)},
+        "features": bad,
+        "training": {"validation_split": 0.2, "random_state": 0},
+        "models": {"linear": {"fit_intercept": True}},
+        "persistence": {"artifact_dir": str(tmp_path / "a"), "save_on_deploy": True},
+    }
+    path = tmp_path / "bad.yaml"
+    path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown suffix"):
+        load_model_config(str(path))
 
 
 def test_lstm_runs_with_feature_patch(tmp_path):

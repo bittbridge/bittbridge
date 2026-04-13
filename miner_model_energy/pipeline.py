@@ -22,6 +22,7 @@ from .features import (
     add_engineered_features,
     add_test_load_features_from_history,
     build_feature_columns,
+    filter_weather_suffix_columns,
 )
 from .ml_config import ModelConfig
 from .models_cart import predict_cart, save_cart, train_cart
@@ -57,6 +58,9 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
 
 def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
     train, test = load_train_test(config.data["train_csv"], config.data["test_csv"])
+    suffix_whitelist = config.features.get("include_weather_suffix_groups")
+    train = filter_weather_suffix_columns(train, suffix_whitelist)
+    test = filter_weather_suffix_columns(test, suffix_whitelist)
     train = add_engineered_features(train, config.features)
     test = add_engineered_features(test, config.features)
 
@@ -83,7 +87,10 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
     if not features:
         raise ValueError(
             "No shared feature columns between train and test after exclusions. "
-            "Check model_params.yaml toggles and CSV schemas."
+            "With include_weather_suffix_groups empty, raw *-tmpf / *-dwpf / *-relh / *-sped / *-drct "
+            "columns are removed; enable engineered features (e.g. use_time_features) and/or "
+            "list suffixes under include_weather_suffix_groups, and ensure the test CSV can "
+            "produce the same columns. Check model_params.yaml toggles and CSV schemas."
         )
     required_train_cols = features + [TARGET_COLUMN]
     train_model = train.dropna(subset=required_train_cols).reset_index(drop=True)

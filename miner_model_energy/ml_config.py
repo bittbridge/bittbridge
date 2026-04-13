@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 import yaml
 
+from .features import KNOWN_WEATHER_SUFFIXES
+
 
 @dataclass(frozen=True)
 class ModelConfig:
@@ -33,6 +35,27 @@ def _require_path(path_value: str, key: str) -> str:
     if not path.exists():
         raise ValueError(f"Config `{key}` points to missing path: {path}")
     return str(path)
+
+
+def _normalize_include_weather_suffix_groups(value: Any) -> List[str]:
+    """Empty list = strip all raw *-tmpf / *-dwpf / … columns. Non-empty = whitelist those suffixes only."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("`features.include_weather_suffix_groups` must be a list of strings (or empty).")
+    out: List[str] = []
+    for item in value:
+        s = str(item).strip().lower()
+        if not s:
+            continue
+        if s not in KNOWN_WEATHER_SUFFIXES:
+            raise ValueError(
+                f"`features.include_weather_suffix_groups` unknown suffix {s!r}. "
+                f"Allowed: {sorted(KNOWN_WEATHER_SUFFIXES)}."
+            )
+        if s not in out:
+            out.append(s)
+    return out
 
 
 def _as_int_list(value: Any, key: str, default: List[int]) -> List[int]:
@@ -84,6 +107,9 @@ def load_model_config(path: str) -> ModelConfig:
         features.get("rolling_load_windows"),
         "features.rolling_load_windows",
         default_rolling,
+    )
+    features["include_weather_suffix_groups"] = _normalize_include_weather_suffix_groups(
+        features.get("include_weather_suffix_groups")
     )
 
     artifact_dir = persistence.get("artifact_dir", "miner_model_energy/artifacts")
