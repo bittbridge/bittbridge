@@ -58,6 +58,8 @@ models:
     dropout: 0.1
     epochs: 5
     batch_size: 64
+    # Fit StandardScaler on training rows (per feature) before sequences; same transform at inference.
+    standardize_inputs: false
     # Keras model.fit verbosity: 0=silent, 1=progress bar + ETA per epoch, 2=one line per epoch
     fit_verbose: 1
 

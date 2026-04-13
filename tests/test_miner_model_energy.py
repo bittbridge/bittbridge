@@ -18,7 +18,13 @@ from miner_model_energy.artifacts import load_manifest
 from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import load_model_config
-from miner_model_energy.pipeline import persist_training_result, predict_single_test_row, train_model
+from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
+from miner_model_energy.pipeline import (
+    load_training_bundle_from_manifest,
+    persist_training_result,
+    predict_single_test_row,
+    train_model,
+)
 
 
 def _weather_row(i: int, start: datetime) -> dict:
@@ -241,6 +247,36 @@ def test_lstm_runs_with_feature_patch(tmp_path):
     cfg = load_model_config(str(cfg_path))
     result = train_model("lstm", cfg)
     assert result.metrics["validation"]["rmse"] >= 0.0
+    assert result.model_bundle.scaler is None
+
+
+def test_lstm_standardize_inputs_and_reload(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"use_time_features": True, "use_load_lags": True},
+    )
+    raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    raw["models"]["lstm"]["standardize_inputs"] = True
+    cfg_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    cfg = load_model_config(str(cfg_path))
+    assert cfg.models["lstm"]["standardize_inputs"] is True
+    result = train_model("lstm", cfg)
+    assert result.model_bundle.scaler is not None
+    pred = predict_single_test_row(result)
+    assert isinstance(pred, float)
+
+    saved = persist_training_result(result, cfg, run_id="pytest_lstm_std")
+    scaler_fp = Path(saved["artifact_dir"]) / LSTM_SCALER_FILENAME
+    assert scaler_fp.is_file()
+    manifest = load_manifest(saved["manifest_path"])
+    assert manifest.get("lstm_standardize_inputs") is True
+    assert manifest.get("lstm_scaler_path") == LSTM_SCALER_FILENAME
+
+    reloaded = load_training_bundle_from_manifest(saved["manifest_path"])
+    assert reloaded.scaler is not None
 
 
 if __name__ == "__main__":

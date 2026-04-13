@@ -28,7 +28,7 @@ from .ml_config import ModelConfig
 from .models_cart import predict_cart, save_cart, train_cart
 from .models_cart import load_cart
 from .models_linear import LinearBundle, load_linear, predict_linear, save_linear, train_linear
-from .models_lstm import load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
+from .models_lstm import LSTM_SCALER_FILENAME, load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
 from .split import temporal_train_val_split
 
 
@@ -296,6 +296,11 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "durations_sec": result.durations_sec,
         "lstm_n_steps": getattr(result.model_bundle, "n_steps", None),
     }
+    if result.model_type == "lstm":
+        lstm_bundle = result.model_bundle
+        lstm_std = lstm_bundle.scaler is not None
+        manifest["lstm_standardize_inputs"] = lstm_std
+        manifest["lstm_scaler_path"] = LSTM_SCALER_FILENAME if lstm_std else None
     manifest_path = write_manifest(out_dir, manifest)
 
     return {
@@ -318,6 +323,11 @@ def load_training_bundle_from_manifest(manifest_path: str):
     if model_type == "cart":
         return load_cart(model_path)
     if model_type == "lstm":
-        return load_lstm(model_path, features=features, n_steps=int(manifest.get("lstm_n_steps", 12)))
+        n_steps_lstm = int(manifest.get("lstm_n_steps", 12))
+        scaler_path: str | None = None
+        if manifest.get("lstm_standardize_inputs"):
+            rel = manifest.get("lstm_scaler_path") or LSTM_SCALER_FILENAME
+            scaler_path = str(artifact_dir / rel)
+        return load_lstm(model_path, features=features, n_steps=n_steps_lstm, scaler_path=scaler_path)
     raise ValueError(f"Unsupported model type in manifest: {model_type}")
 

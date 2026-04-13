@@ -102,6 +102,7 @@ def load_model_config(path: str) -> ModelConfig:
     if fit_verbose not in (0, 1, 2):
         raise ValueError("`models.lstm.fit_verbose` must be 0, 1, or 2 (Keras fit verbosity).")
     lstm_cfg["fit_verbose"] = fit_verbose
+    lstm_cfg["standardize_inputs"] = bool(lstm_cfg.get("standardize_inputs", False))
 
     for key in FEATURE_BOOL_KEYS:
         features[key] = bool(features.get(key, False))
