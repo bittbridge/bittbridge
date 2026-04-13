@@ -48,6 +48,7 @@ def train_lstm(
     features: List[str],
     cfg: Dict,
     random_state: int = 42,
+    fit_verbose: int = 0,
 ) -> LstmBundle:
     _set_random_seeds(int(random_state))
     Sequential, LSTM, Dense, Dropout = _require_keras()
@@ -69,7 +70,10 @@ def train_lstm(
         ]
     )
     model.compile(optimizer="adam", loss="mse")
-    model.fit(X_seq, y_seq, epochs=epochs, batch_size=batch_size, verbose=0)
+    v_fit = int(fit_verbose)
+    if v_fit not in (0, 1, 2):
+        v_fit = 0
+    model.fit(X_seq, y_seq, epochs=epochs, batch_size=batch_size, verbose=v_fit)
     return LstmBundle(model=model, features=features, n_steps=n_steps)
 
 

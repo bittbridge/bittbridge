@@ -48,6 +48,16 @@ def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
     return frame[features].astype(float).to_numpy()
 
 
+def _fmt_sec(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    m, s = divmod(int(seconds), 60)
+    if m < 60:
+        return f"{m}m {s}s"
+    h, m2 = divmod(m, 60)
+    return f"{h}h {m2}m {s}s"
+
+
 def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
@@ -100,9 +110,20 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
 
 
 def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
+    show_progress = bool(config.training.get("show_training_progress", True))
+    lstm_fit_verbose = int(config.models.get("lstm", {}).get("fit_verbose", 1))
+
     t0 = time.perf_counter()
+    if show_progress:
+        print("  [train] (1/4) Loading CSVs and building features…", flush=True)
     train_model, test, features = prepare_training_data(config)
     t1 = time.perf_counter()
+    if show_progress:
+        print(
+            f"  [train]     ✓ {_fmt_sec(t1 - t0)} — {len(train_model):,} rows, {len(features)} features",
+            flush=True,
+        )
+        print("  [train] (2/4) Building arrays and temporal train/val split…", flush=True)
     train_split, val_split = temporal_train_val_split(
         train_model, validation_split=config.training["validation_split"]
     )
@@ -111,8 +132,18 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     X_val = _as_numpy(val_split, features)
     y_val = val_split[TARGET_COLUMN].to_numpy()
     X_test = test[features].astype(float).to_numpy()
+    t2 = time.perf_counter()
+    if show_progress:
+        print(
+            f"  [train]     ✓ {_fmt_sec(t2 - t1)} — train {X_train.shape}, val {X_val.shape}",
+            flush=True,
+        )
 
     rs = int(config.training.get("random_state", 42))
+    if show_progress:
+        print(f"  [train] (3/4) Training {model_type} (fit + train/val predictions)…", flush=True)
+
+    t_fit_start = time.perf_counter()
     if model_type == "linear":
         bundle: LinearBundle = train_linear(X_train, y_train, features, config.models.get("linear", {}))
         train_pred = predict_linear(bundle, X_train)
@@ -124,7 +155,14 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         train_pred = predict_cart(bundle, X_train)
         val_pred = predict_cart(bundle, X_val)
     elif model_type == "lstm":
-        bundle = train_lstm(X_train, y_train, features, config.models.get("lstm", {}), random_state=rs)
+        bundle = train_lstm(
+            X_train,
+            y_train,
+            features,
+            config.models.get("lstm", {}),
+            random_state=rs,
+            fit_verbose=lstm_fit_verbose,
+        )
         n_steps = bundle.n_steps
         X_train_seq, y_train_seq = make_sequences(X_train, y_train, n_steps=n_steps)
         X_val_seq, y_val_seq = make_sequences(X_val, y_val, n_steps=n_steps)
@@ -139,20 +177,34 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
-    t2 = time.perf_counter()
+    t_fit_end = time.perf_counter()
+    if show_progress:
+        print(
+            f"  [train]     ✓ step (3/4) done in {_fmt_sec(t_fit_end - t_fit_start)}",
+            flush=True,
+        )
+        print("  [train] (4/4) Aggregating train/validation metrics…", flush=True)
+
+    metrics = {
+        "train": _metrics(y_train, train_pred),
+        "validation": _metrics(y_val, val_pred),
+    }
+    t3 = time.perf_counter()
     durations_sec = {
         "prepare_data_sec": t1 - t0,
-        "split_and_fit_sec": t2 - t1,
-        "total_sec": t2 - t0,
+        "split_arrays_sec": t2 - t1,
+        "fit_sec": t_fit_end - t_fit_start,
+        "metrics_sec": t3 - t_fit_end,
+        "split_and_fit_sec": t3 - t1,
+        "total_sec": t3 - t0,
     }
+    if show_progress:
+        print(f"  [train]     ✓ done — total {_fmt_sec(t3 - t0)}", flush=True)
 
     return TrainingResult(
         model_type=model_type,
         model_bundle=bundle,
-        metrics={
-            "train": _metrics(y_train, train_pred),
-            "validation": _metrics(y_val, val_pred),
-        },
+        metrics=metrics,
         features=features,
         train_frame=train_model,
         test_frame=test,

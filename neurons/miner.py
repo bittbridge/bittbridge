@@ -73,6 +73,12 @@ def _print_training_timeline(result) -> None:
     _sub("-" * (_SECTION_WIDTH - 4))
     if "prepare_data_sec" in d:
         _sub(f"  Data prep (load + features):     {_format_seconds(d['prepare_data_sec'])}")
+    if "split_arrays_sec" in d:
+        _sub(f"  Arrays + temporal split:         {_format_seconds(d['split_arrays_sec'])}")
+    if "fit_sec" in d:
+        _sub(f"  Train (fit + predictions):       {_format_seconds(d['fit_sec'])}")
+    if "metrics_sec" in d:
+        _sub(f"  Metrics aggregation:             {_format_seconds(d['metrics_sec'])}")
     if "split_and_fit_sec" in d:
         _sub(f"  Split + train + metrics:         {_format_seconds(d['split_and_fit_sec'])}")
     if "total_sec" in d:

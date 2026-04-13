@@ -94,6 +94,14 @@ def load_model_config(path: str) -> ModelConfig:
     training["validation_split"] = validation_split
 
     training["random_state"] = int(training.get("random_state", 42))
+    training["show_training_progress"] = bool(training.get("show_training_progress", True))
+
+    lstm_cfg = models.setdefault("lstm", {})
+    fit_verbose = lstm_cfg.get("fit_verbose", 1)
+    fit_verbose = int(fit_verbose)
+    if fit_verbose not in (0, 1, 2):
+        raise ValueError("`models.lstm.fit_verbose` must be 0, 1, or 2 (Keras fit verbosity).")
+    lstm_cfg["fit_verbose"] = fit_verbose
 
     for key in FEATURE_BOOL_KEYS:
         features[key] = bool(features.get(key, False))

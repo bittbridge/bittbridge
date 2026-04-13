@@ -71,11 +71,22 @@ def _write_config(tmp_path, train_path, test_path, feature_patch: dict | None = 
     cfg = {
         "data": {"train_csv": str(train_path), "test_csv": str(test_path)},
         "features": features,
-        "training": {"validation_split": 0.2, "random_state": 123},
+        "training": {
+            "validation_split": 0.2,
+            "random_state": 123,
+            "show_training_progress": False,
+        },
         "models": {
             "linear": {"fit_intercept": True},
             "cart": {"max_depth": 4, "min_samples_split": 4, "min_samples_leaf": 2},
-            "lstm": {"n_steps": 12, "units": 8, "dropout": 0.1, "epochs": 1, "batch_size": 16},
+            "lstm": {
+                "n_steps": 12,
+                "units": 8,
+                "dropout": 0.1,
+                "epochs": 1,
+                "batch_size": 16,
+                "fit_verbose": 0,
+            },
         },
         "persistence": {"artifact_dir": str(tmp_path / "artifacts"), "save_on_deploy": True},
     }
