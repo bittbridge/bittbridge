@@ -42,9 +42,8 @@ def _write_config(tmp_path, train_path, test_path):
             "use_load_delta": True,
             "load_lag_steps": [1, 2, 3],
         },
-        "training": {"selected_model": "linear", "validation_split": 0.2},
+        "training": {"validation_split": 0.2},
         "models": {
-            "enabled": {"linear": True, "cart": True, "lstm": False},
             "linear": {"fit_intercept": True},
             "cart": {"max_depth": 4, "min_samples_split": 4, "min_samples_leaf": 2},
             "lstm": {"n_steps": 12, "units": 8, "dropout": 0.1, "epochs": 1, "batch_size": 16},

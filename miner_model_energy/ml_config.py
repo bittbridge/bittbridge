@@ -7,9 +7,6 @@ from typing import Any, Dict
 import yaml
 
 
-ALLOWED_MODELS = {"linear", "cart", "lstm"}
-
-
 @dataclass(frozen=True)
 class ModelConfig:
     data: Dict[str, Any]
@@ -49,18 +46,6 @@ def load_model_config(path: str) -> ModelConfig:
     if validation_split <= 0.0 or validation_split >= 0.5:
         raise ValueError("`training.validation_split` must be between 0 and 0.5.")
     training["validation_split"] = validation_split
-
-    selected_model = str(training.get("selected_model", "linear")).lower()
-    if selected_model not in ALLOWED_MODELS:
-        raise ValueError(
-            "`training.selected_model` must be one of: linear, cart, lstm."
-        )
-    training["selected_model"] = selected_model
-
-    enabled = models.get("enabled", {})
-    for model_name in ALLOWED_MODELS:
-        enabled[model_name] = bool(enabled.get(model_name, model_name != "lstm"))
-    models["enabled"] = enabled
 
     for key in (
         "use_time_features",

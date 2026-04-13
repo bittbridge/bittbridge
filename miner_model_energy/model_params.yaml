@@ -1,23 +1,30 @@
+# CSV paths resolved at config load; files must exist or startup fails.
 data:
   train_csv: miner_model_energy/TRAIN-updated-train-data_3-25-26.csv
   test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
 
+# Feature toggles: when false, those engineered columns are dropped so train/test schemas match.
 features:
+  # Calendar fields from the timestamp column (hour, day_of_week, month).
   use_time_features: false
+  # Sine/cosine encodings of hour and day-of-week for smooth cyclical signals.
   use_cyclical_features: false
+  # Past Total Load as load_lag_<k> (k = row offset; with 5-min rows, k=12 is one hour back).
   use_load_lags: false
+  # Short-horizon load changes from shifted target (no same-row leakage).
   use_load_delta: false
-  load_lag_steps: [1, 2, 3, 6, 12]
+  # Which lag offsets to create when use_load_lags is true (ignored when that flag is false).
+  # Set lookback window for load lags (1 = 5 minutes, 2 = 10 minutes, etc.)
+  # Can add more steps if needed, but more steps means more data points, which means more training time.
+  # 1 = 5 minutes, 2 = 10 minutes, 5 = 25 minutes, 8 = 40 minutes, 12 = 1 hour, 24 = 2 hours, etc.
+  load_lag_steps: [1, 2]
 
+# Validation splif of training data to use for validation metrics.
 training:
-  selected_model: linear
   validation_split: 0.2
 
+# Hyperparameters passed to each estimator; which model runs is chosen in code (miner prompt or smoke --model).
 models:
-  enabled:
-    linear: true
-    cart: true
-    lstm: false
   linear:
     fit_intercept: true
   cart:
@@ -31,6 +38,7 @@ models:
     epochs: 5
     batch_size: 64
 
+# Where training artifacts are written and whether deploy flows should persist them.
 persistence:
   artifact_dir: miner_model_energy/artifacts
   save_on_deploy: true
