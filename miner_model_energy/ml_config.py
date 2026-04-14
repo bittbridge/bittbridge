@@ -103,6 +103,14 @@ def load_model_config(path: str) -> ModelConfig:
         raise ValueError("`models.lstm.fit_verbose` must be 0, 1, or 2 (Keras fit verbosity).")
     lstm_cfg["fit_verbose"] = fit_verbose
     lstm_cfg["standardize_inputs"] = bool(lstm_cfg.get("standardize_inputs", False))
+    lstm_cfg["learning_rate"] = float(lstm_cfg.get("learning_rate", 0.001))
+    lstm_cfg["dense_units"] = int(lstm_cfg.get("dense_units", 16))
+    if lstm_cfg["dense_units"] < 0:
+        raise ValueError("`models.lstm.dense_units` must be >= 0 (0 = no hidden Dense, only LSTM → Dropout → Dense(1)).")
+    lstm_cfg["use_early_stopping"] = bool(lstm_cfg.get("use_early_stopping", True))
+    lstm_cfg["early_stopping_patience"] = int(lstm_cfg.get("early_stopping_patience", 5))
+    if lstm_cfg["early_stopping_patience"] < 0:
+        raise ValueError("`models.lstm.early_stopping_patience` must be >= 0 (0 disables early stopping).")
 
     for key in FEATURE_BOOL_KEYS:
         features[key] = bool(features.get(key, False))

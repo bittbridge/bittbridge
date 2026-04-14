@@ -53,11 +53,19 @@ models:
     min_samples_leaf: 5
   
   lstm:
+    # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
+    # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM.
     n_steps: 12
     units: 32
     dropout: 0.1
-    epochs: 5
-    batch_size: 64
+    epochs: 20
+    batch_size: 32
+    # Hidden Dense after LSTM (notebook-style). Set to 0 for LSTM → Dropout → Dense(1) only.
+    dense_units: 16
+    learning_rate: 0.001
+    # validation_data + EarlyStopping on val_loss (matches typical notebook training).
+    use_early_stopping: true
+    early_stopping_patience: 5
     # Fit StandardScaler on training rows (per feature) before sequences; same transform at inference.
     standardize_inputs: false
     # Keras model.fit verbosity: 0=silent, 1=progress bar + ETA per epoch, 2=one line per epoch

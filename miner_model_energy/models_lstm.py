@@ -19,12 +19,14 @@ class LstmBundle:
 def _require_keras():
     try:
         from tensorflow.keras import Sequential
+        from tensorflow.keras.callbacks import EarlyStopping
         from tensorflow.keras.layers import Dense, Dropout, LSTM
+        from tensorflow.keras.optimizers import Adam
     except Exception as exc:
         raise RuntimeError(
             "LSTM requested but TensorFlow/Keras is unavailable. Install tensorflow."
         ) from exc
-    return Sequential, LSTM, Dense, Dropout
+    return Sequential, LSTM, Dense, Dropout, Adam, EarlyStopping
 
 
 def make_sequences(X: np.ndarray, y: np.ndarray, n_steps: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -52,9 +54,11 @@ def train_lstm(
     cfg: Dict,
     random_state: int = 42,
     fit_verbose: int = 0,
+    X_val: Optional[np.ndarray] = None,
+    y_val: Optional[np.ndarray] = None,
 ) -> LstmBundle:
     _set_random_seeds(int(random_state))
-    Sequential, LSTM, Dense, Dropout = _require_keras()
+    Sequential, LSTM, Dense, Dropout, Adam, EarlyStopping = _require_keras()
     n_steps = int(cfg.get("n_steps", 12))
     standardize_inputs = bool(cfg.get("standardize_inputs", False))
     scaler: Optional[object] = None
@@ -64,42 +68,88 @@ def train_lstm(
 
         scaler = StandardScaler()
         X_work = scaler.fit_transform(X_work)
+    X_work = np.asarray(X_work, dtype=np.float32)
     X_seq, y_seq = make_sequences(X_work, y_train, n_steps=n_steps)
     if len(X_seq) == 0:
         raise ValueError("Not enough rows to train LSTM sequence model.")
+    X_seq = np.asarray(X_seq, dtype=np.float32)
+    y_seq = np.asarray(y_seq, dtype=np.float32)
+
+    X_val_seq: Optional[np.ndarray] = None
+    y_val_seq: Optional[np.ndarray] = None
+    if X_val is not None and y_val is not None:
+        Xv = np.asarray(X_val, dtype=float)
+        if scaler is not None:
+            Xv = scaler.transform(Xv)
+        Xv = np.asarray(Xv, dtype=np.float32)
+        X_val_seq, y_val_seq = make_sequences(Xv, y_val, n_steps=n_steps)
+        if len(X_val_seq) > 0:
+            X_val_seq = np.asarray(X_val_seq, dtype=np.float32)
+            y_val_seq = np.asarray(y_val_seq, dtype=np.float32)
+        else:
+            X_val_seq, y_val_seq = None, None
 
     units = int(cfg.get("units", 32))
     epochs = int(cfg.get("epochs", 5))
     batch_size = int(cfg.get("batch_size", 64))
     dropout = float(cfg.get("dropout", 0.1))
+    learning_rate = float(cfg.get("learning_rate", 0.001))
+    dense_units = int(cfg.get("dense_units", 16))
+    use_early_stopping = bool(cfg.get("use_early_stopping", True))
+    early_patience = int(cfg.get("early_stopping_patience", 5))
 
-    model = Sequential(
-        [
-            LSTM(units, input_shape=(n_steps, X_seq.shape[2])),
-            Dropout(dropout),
-            Dense(1),
-        ]
-    )
-    model.compile(optimizer="adam", loss="mse")
-    v_fit = int(fit_verbose)
-    if v_fit not in (0, 1, 2):
-        v_fit = 0
-    model.fit(X_seq, y_seq, epochs=epochs, batch_size=batch_size, verbose=v_fit)
+    head_layers = [
+        LSTM(units, input_shape=(n_steps, X_seq.shape[2])),
+        Dropout(dropout),
+    ]
+    if dense_units > 0:
+        head_layers.append(Dense(dense_units, activation="relu"))
+    head_layers.append(Dense(1))
+    model = Sequential(head_layers)
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss="mse", metrics=["mae"])
+
+    fit_kwargs: Dict = {
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "verbose": int(fit_verbose) if int(fit_verbose) in (0, 1, 2) else 0,
+    }
+    if X_val_seq is not None and y_val_seq is not None:
+        fit_kwargs["validation_data"] = (X_val_seq, y_val_seq)
+    callbacks = []
+    if (
+        use_early_stopping
+        and early_patience > 0
+        and X_val_seq is not None
+        and y_val_seq is not None
+    ):
+        callbacks.append(
+            EarlyStopping(
+                monitor="val_loss",
+                patience=early_patience,
+                restore_best_weights=True,
+            )
+        )
+    if callbacks:
+        fit_kwargs["callbacks"] = callbacks
+
+    model.fit(X_seq, y_seq, **fit_kwargs)
     return LstmBundle(model=model, features=features, n_steps=n_steps, scaler=scaler)
 
 
 def _apply_input_scaler(bundle: LstmBundle, X: np.ndarray) -> np.ndarray:
     if bundle.scaler is None:
-        return np.asarray(X, dtype=float)
+        return np.asarray(X, dtype=np.float32)
     Xf = np.asarray(X, dtype=float)
     if Xf.ndim == 2:
-        return bundle.scaler.transform(Xf)
-    if Xf.ndim == 3:
+        out = bundle.scaler.transform(Xf)
+    elif Xf.ndim == 3:
         n, t, f = Xf.shape
         flat = Xf.reshape(-1, f)
         scaled = bundle.scaler.transform(flat)
-        return scaled.reshape(n, t, f)
-    raise ValueError(f"LSTM input must be 2D or 3D; got shape {Xf.shape}")
+        out = scaled.reshape(n, t, f)
+    else:
+        raise ValueError(f"LSTM input must be 2D or 3D; got shape {Xf.shape}")
+    return np.asarray(out, dtype=np.float32)
 
 
 def predict_lstm(bundle: LstmBundle, X: np.ndarray) -> np.ndarray:

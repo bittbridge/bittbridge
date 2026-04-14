@@ -162,6 +162,8 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
             config.models.get("lstm", {}),
             random_state=rs,
             fit_verbose=lstm_fit_verbose,
+            X_val=X_val,
+            y_val=y_val,
         )
         n_steps = bundle.n_steps
         X_train_seq, y_train_seq = make_sequences(X_train, y_train, n_steps=n_steps)
