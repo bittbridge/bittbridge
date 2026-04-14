@@ -93,6 +93,15 @@ def _write_config(tmp_path, train_path, test_path, feature_patch: dict | None = 
                 "batch_size": 16,
                 "fit_verbose": 0,
             },
+            "rnn": {
+                "n_steps": 12,
+                "units": 8,
+                "dropout": 0.1,
+                "epochs": 1,
+                "batch_size": 16,
+                "use_early_stopping": False,
+                "fit_verbose": 0,
+            },
         },
         "persistence": {"artifact_dir": str(tmp_path / "artifacts"), "save_on_deploy": True},
     }
@@ -234,6 +243,20 @@ def test_load_config_rejects_unknown_weather_suffix(tmp_path):
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     with pytest.raises(ValueError, match="unknown suffix"):
         load_model_config(str(path))
+
+
+def test_rnn_runs_with_feature_patch(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"use_time_features": True, "use_load_lags": True},
+    )
+    cfg = load_model_config(str(cfg_path))
+    result = train_model("rnn", cfg)
+    assert result.metrics["validation"]["rmse"] >= 0.0
+    assert result.model_bundle.scaler is None
 
 
 def test_lstm_runs_with_feature_patch(tmp_path):

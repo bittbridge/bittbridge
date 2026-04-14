@@ -36,7 +36,7 @@ features:
   load_lag_steps: [24]
   rolling_load_windows: [3, 6]
 
-# validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART and LSTM.
+# validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART / RNN / LSTM.
 # show_training_progress: phased [train] logs + timings; linear/cart have no intra-fit bar (sklearn).
 training:
   validation_split: 0.2
@@ -59,16 +59,30 @@ models:
     units: 32
     dropout: 0.1
     epochs: 20
-    batch_size: 32
+    batch_size: 16
     # Hidden Dense after LSTM (notebook-style). Set to 0 for LSTM → Dropout → Dense(1) only.
     dense_units: 16
     learning_rate: 0.001
-    # validation_data + EarlyStopping on val_loss (matches typical notebook training).
+    # validation_data + EarlyStopping on val_loss
     use_early_stopping: true
     early_stopping_patience: 5
     # Fit StandardScaler on training rows (per feature) before sequences; same transform at inference.
     standardize_inputs: false
     # Keras model.fit verbosity: 0=silent, 1=progress bar + ETA per epoch, 2=one line per epoch
+    fit_verbose: 1
+
+  # Keras SimpleRNN (vanilla RNN). Same hyperparameter shape as lstm; see lstm block for OOM hints.
+  rnn:
+    n_steps: 12
+    units: 32
+    dropout: 0.1
+    epochs: 20
+    batch_size: 16
+    dense_units: 16
+    learning_rate: 0.001
+    use_early_stopping: true
+    early_stopping_patience: 5
+    standardize_inputs: false
     fit_verbose: 1
 
 persistence:

@@ -29,6 +29,7 @@ from .models_cart import predict_cart, save_cart, train_cart
 from .models_cart import load_cart
 from .models_linear import LinearBundle, load_linear, predict_linear, save_linear, train_linear
 from .models_lstm import LSTM_SCALER_FILENAME, load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
+from .models_rnn import RNN_SCALER_FILENAME, load_rnn, predict_rnn, save_rnn, train_rnn
 from .split import temporal_train_val_split
 
 
@@ -112,6 +113,7 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
 def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     show_progress = bool(config.training.get("show_training_progress", True))
     lstm_fit_verbose = int(config.models.get("lstm", {}).get("fit_verbose", 1))
+    rnn_fit_verbose = int(config.models.get("rnn", {}).get("fit_verbose", 1))
 
     t0 = time.perf_counter()
     if show_progress:
@@ -176,6 +178,28 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         val_pred = predict_lstm(bundle, X_val_seq)
         y_train = y_train_seq
         y_val = y_val_seq
+    elif model_type == "rnn":
+        bundle = train_rnn(
+            X_train,
+            y_train,
+            features,
+            config.models.get("rnn", {}),
+            random_state=rs,
+            fit_verbose=rnn_fit_verbose,
+            X_val=X_val,
+            y_val=y_val,
+        )
+        n_steps = bundle.n_steps
+        X_train_seq, y_train_seq = make_sequences(X_train, y_train, n_steps=n_steps)
+        X_val_seq, y_val_seq = make_sequences(X_val, y_val, n_steps=n_steps)
+        if len(X_train_seq) == 0:
+            raise ValueError("Training split too short for RNN sequence evaluation.")
+        if len(X_val_seq) == 0:
+            raise ValueError("Validation split too short for RNN sequence evaluation.")
+        train_pred = predict_rnn(bundle, X_train_seq)
+        val_pred = predict_rnn(bundle, X_val_seq)
+        y_train = y_train_seq
+        y_val = y_val_seq
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -221,9 +245,9 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     )
 
 
-def build_lstm_inference_matrix(result: TrainingResult) -> np.ndarray:
+def build_sequence_inference_matrix(result: TrainingResult) -> np.ndarray:
     """
-    LSTM needs shape (n_steps, n_features). TEST often has one row; prepend the last
+    LSTM / RNN need shape (n_steps, n_features). TEST often has one row; prepend the last
     (n_steps - 1) rows from train so the window matches training-time sequences.
     """
     bundle = result.model_bundle
@@ -238,11 +262,16 @@ def build_lstm_inference_matrix(result: TrainingResult) -> np.ndarray:
     need_prior = n_steps - test_x.shape[0]
     if train_x.shape[0] < need_prior:
         raise ValueError(
-            f"LSTM inference needs {need_prior} prior timestep(s) from training history; "
+            f"Sequence model inference needs {need_prior} prior timestep(s) from training history; "
             f"train_frame has only {train_x.shape[0]} row(s)."
         )
     prior = train_x[-need_prior:]
     return np.vstack([prior, test_x])
+
+
+def build_lstm_inference_matrix(result: TrainingResult) -> np.ndarray:
+    """Backward-compatible alias for :func:`build_sequence_inference_matrix`."""
+    return build_sequence_inference_matrix(result)
 
 
 def predict_single_test_row(result: TrainingResult) -> float:
@@ -252,8 +281,11 @@ def predict_single_test_row(result: TrainingResult) -> float:
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, X_test)[0]
     elif result.model_type == "lstm":
-        seq_2d = build_lstm_inference_matrix(result)
+        seq_2d = build_sequence_inference_matrix(result)
         pred = predict_lstm(result.model_bundle, seq_2d)[0]
+    elif result.model_type == "rnn":
+        seq_2d = build_sequence_inference_matrix(result)
+        pred = predict_rnn(result.model_bundle, seq_2d)[0]
     else:
         raise ValueError(f"Unsupported model type: {result.model_type}")
     return float(pred)
@@ -273,6 +305,9 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
     elif result.model_type == "lstm":
         model_rel = "model_lstm.keras"
         save_lstm(result.model_bundle, str(out_dir / model_rel))
+    elif result.model_type == "rnn":
+        model_rel = "model_rnn.keras"
+        save_rnn(result.model_bundle, str(out_dir / model_rel))
 
     metrics_path = out_dir / "metrics.json"
     metrics_path.write_text(pd.Series(result.metrics).to_json(indent=2), encoding="utf-8")
@@ -296,13 +331,23 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "train_rows": int(len(result.train_frame)),
         "metrics": result.metrics,
         "durations_sec": result.durations_sec,
-        "lstm_n_steps": getattr(result.model_bundle, "n_steps", None),
+        "lstm_n_steps": getattr(result.model_bundle, "n_steps", None)
+        if result.model_type == "lstm"
+        else None,
+        "rnn_n_steps": getattr(result.model_bundle, "n_steps", None)
+        if result.model_type == "rnn"
+        else None,
     }
     if result.model_type == "lstm":
         lstm_bundle = result.model_bundle
         lstm_std = lstm_bundle.scaler is not None
         manifest["lstm_standardize_inputs"] = lstm_std
         manifest["lstm_scaler_path"] = LSTM_SCALER_FILENAME if lstm_std else None
+    if result.model_type == "rnn":
+        rnn_bundle = result.model_bundle
+        rnn_std = rnn_bundle.scaler is not None
+        manifest["rnn_standardize_inputs"] = rnn_std
+        manifest["rnn_scaler_path"] = RNN_SCALER_FILENAME if rnn_std else None
     manifest_path = write_manifest(out_dir, manifest)
 
     return {
@@ -331,5 +376,12 @@ def load_training_bundle_from_manifest(manifest_path: str):
             rel = manifest.get("lstm_scaler_path") or LSTM_SCALER_FILENAME
             scaler_path = str(artifact_dir / rel)
         return load_lstm(model_path, features=features, n_steps=n_steps_lstm, scaler_path=scaler_path)
+    if model_type == "rnn":
+        n_steps_rnn = int(manifest.get("rnn_n_steps", 12))
+        scaler_path_rnn: str | None = None
+        if manifest.get("rnn_standardize_inputs"):
+            rel = manifest.get("rnn_scaler_path") or RNN_SCALER_FILENAME
+            scaler_path_rnn = str(artifact_dir / rel)
+        return load_rnn(model_path, features=features, n_steps=n_steps_rnn, scaler_path=scaler_path_rnn)
     raise ValueError(f"Unsupported model type in manifest: {model_type}")
 

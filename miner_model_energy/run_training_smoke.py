@@ -18,7 +18,7 @@ def main():
         "--model",
         type=str,
         default="linear",
-        choices=["linear", "cart", "lstm"],
+        choices=["linear", "cart", "rnn", "lstm"],
         help="Model to train in smoke mode.",
     )
     args = parser.parse_args()

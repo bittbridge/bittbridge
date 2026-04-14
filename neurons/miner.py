@@ -132,12 +132,12 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
 
 def _ask_model_type_preflight() -> str:
     try:
-        answer = input("  Select model (linear / cart / lstm): ").strip().lower()
+        answer = input("  Select model (linear / cart / rnn / lstm): ").strip().lower()
     except EOFError:
         return "linear"
     if not answer:
         return "linear"
-    if answer not in {"linear", "cart", "lstm"}:
+    if answer not in {"linear", "cart", "rnn", "lstm"}:
         print("  Unknown choice; defaulting to linear.")
         return "linear"
     return answer
@@ -149,7 +149,7 @@ def _ask_after_deploy_decline() -> str:
     """
     _section("Deploy declined — what next?")
     _sub("  [1]  Continue with baseline moving-average model")
-    _sub("  [2]  Train another advanced model (linear / cart / lstm)")
+    _sub("  [2]  Train another advanced model (linear / cart / rnn / lstm)")
     print()
     while True:
         try:
