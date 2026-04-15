@@ -110,7 +110,7 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
         out["minute_of_day_sin"] = np.sin(2 * np.pi * minute_of_day / 1440.0)
         out["minute_of_day_cos"] = np.cos(2 * np.pi * minute_of_day / 1440.0)
 
-    tmpf_cols, dwpf_cols, relh_cols, sped_cols, drct_cols = _weather_column_groups(out.columns)
+    tmpf_cols, dwpf_cols, relh_cols, sped_cols = _weather_column_groups(out.columns)
 
     if feature_cfg.get("use_station_agg_features", False):
         if tmpf_cols:
@@ -139,26 +139,6 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
         if gap_cols:
             out["temp_dew_gap_mean"] = out[gap_cols].mean(axis=1)
             out["temp_dew_gap_std"] = _row_std_across_stations(out[gap_cols])
-
-    if feature_cfg.get("use_wind_vector_features", False) and drct_cols:
-        wind_x_cols: List[str] = []
-        wind_y_cols: List[str] = []
-        station_prefixes = sorted({c.split("-")[0] for c in drct_cols})
-        for station in station_prefixes:
-            drct_col = f"{station}-drct"
-            sped_col = f"{station}-sped"
-            if drct_col in out.columns and sped_col in out.columns:
-                radians = np.deg2rad(pd.to_numeric(out[drct_col], errors="coerce").astype(float))
-                sped = pd.to_numeric(out[sped_col], errors="coerce").astype(float)
-                x_col = f"{station}_wind_x"
-                y_col = f"{station}_wind_y"
-                out[x_col] = sped * np.cos(radians)
-                out[y_col] = sped * np.sin(radians)
-                wind_x_cols.append(x_col)
-                wind_y_cols.append(y_col)
-        if wind_x_cols:
-            out["wind_x_mean"] = out[wind_x_cols].mean(axis=1)
-            out["wind_y_mean"] = out[wind_y_cols].mean(axis=1)
 
     if TARGET_COLUMN in out.columns:
         lag_steps = feature_cfg.get("load_lag_steps", DEFAULT_LAGS)
@@ -230,17 +210,6 @@ def _drop_features_disabled_by_config(out: pd.DataFrame, feature_cfg: Dict) -> N
             for c in out.columns
             if str(c).endswith("_temp_dew_gap")
             or str(c) in ("temp_dew_gap_mean", "temp_dew_gap_std")
-        ]
-        if to_drop:
-            out.drop(columns=to_drop, inplace=True)
-
-    if not feature_cfg.get("use_wind_vector_features", False):
-        to_drop = [
-            c
-            for c in out.columns
-            if str(c).endswith("_wind_x")
-            or str(c).endswith("_wind_y")
-            or str(c) in ("wind_x_mean", "wind_y_mean")
         ]
         if to_drop:
             out.drop(columns=to_drop, inplace=True)

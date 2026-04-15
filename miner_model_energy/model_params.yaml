@@ -24,9 +24,6 @@ features:
   # Per-station (tmpf - dwpf) plus mean/std across stations when pairs exist
   use_temp_dew_gap: false
 
-  # Wind u/v components per station (speed * cos/sin(direction)) plus mean u/v
-  use_wind_vector_features: false
-
   # Past Total Load columns load_lag_<k> (k rows back; 5-min cadence ⇒ k=12 is one hour).
   use_load_lags: false
 

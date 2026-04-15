@@ -23,7 +23,6 @@ FEATURE_BOOL_KEYS = (
     "use_cyclical_features",
     "use_station_agg_features",
     "use_temp_dew_gap",
-    "use_wind_vector_features",
     "use_load_lags",
     "use_load_rolling",
     "use_load_delta",
