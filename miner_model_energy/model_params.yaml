@@ -97,7 +97,7 @@ data:
   train_csv: miner_model_energy/TRAIN-updated-train-data_3-25-26.csv
   test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
   supabase_url: https://lparhzmnwbslsskxswfr.supabase.co
-  supabase_key: sb_publishable_7w6NQnZBm4U9-lwlwVVsCg_6l1z0vgm
+  supabase_key: sb_publishable_Z5tzsGbj045iGDqZspFU0A_voHhnp7H
   supabase_schema: hackathon
   supabase_train_table: hackathon-train-data
   supabase_test_table: hackathon-test-data
