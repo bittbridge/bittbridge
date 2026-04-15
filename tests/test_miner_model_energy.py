@@ -21,10 +21,12 @@ from miner_model_energy.ml_config import load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
 from miner_model_energy.pipeline import (
     load_training_bundle_from_manifest,
+    prepare_training_data,
     persist_training_result,
     predict_single_test_row,
     train_model,
 )
+from miner_model_energy.supabase_io import fetch_supabase_test_row, fetch_supabase_train_all
 
 
 def _weather_row(i: int, start: datetime) -> dict:
@@ -69,12 +71,21 @@ def _default_features():
     }
 
 
-def _write_config(tmp_path, train_path, test_path, feature_patch: dict | None = None):
+def _write_config(
+    tmp_path,
+    train_path,
+    test_path,
+    feature_patch: dict | None = None,
+    data_patch: dict | None = None,
+):
     features = _default_features()
     if feature_patch:
         features.update(feature_patch)
+    data_cfg = {"train_csv": str(train_path), "test_csv": str(test_path)}
+    if data_patch:
+        data_cfg.update(data_patch)
     cfg = {
-        "data": {"train_csv": str(train_path), "test_csv": str(test_path)},
+        "data": data_cfg,
         "features": features,
         "training": {
             "validation_split": 0.2,
@@ -298,6 +309,170 @@ def test_lstm_standardize_inputs_and_reload(tmp_path):
 
     reloaded = load_training_bundle_from_manifest(saved["manifest_path"])
     assert reloaded.scaler is not None
+
+
+class _FakeResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeQuery:
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self._predicates = []
+        self._order_desc = False
+        self._range = None
+        self._limit = None
+
+    def select(self, *_args, **_kwargs):
+        return self
+
+    def order(self, _col, desc=False):
+        self._order_desc = bool(desc)
+        return self
+
+    def range(self, start, end):
+        self._range = (int(start), int(end))
+        return self
+
+    def limit(self, n):
+        self._limit = int(n)
+        return self
+
+    def eq(self, key, value):
+        self._predicates.append(("eq", key, value))
+        return self
+
+    def gte(self, key, value):
+        self._predicates.append(("gte", key, value))
+        return self
+
+    def lte(self, key, value):
+        self._predicates.append(("lte", key, value))
+        return self
+
+    def execute(self):
+        rows = list(self._rows)
+        for op, key, value in self._predicates:
+            if op == "eq":
+                rows = [r for r in rows if str(r.get(key)) == str(value)]
+            elif op == "gte":
+                rows = [r for r in rows if str(r.get(key)) >= str(value)]
+            elif op == "lte":
+                rows = [r for r in rows if str(r.get(key)) <= str(value)]
+        rows = sorted(rows, key=lambda r: str(r.get("dt")), reverse=self._order_desc)
+        if self._range is not None:
+            start, end = self._range
+            rows = rows[start : end + 1]
+        if self._limit is not None:
+            rows = rows[: self._limit]
+        return _FakeResponse(rows)
+
+
+class _FakeSchemaClient:
+    def __init__(self, tables):
+        self._tables = tables
+
+    def table(self, name):
+        return _FakeQuery(self._tables[name])
+
+
+class _FakeSupabaseClient:
+    def __init__(self, tables):
+        self._tables = tables
+
+    def schema(self, _schema_name):
+        return _FakeSchemaClient(self._tables)
+
+
+def test_fetch_supabase_train_all_paginates_and_normalizes():
+    train_rows = [
+        {"dt": "2026-04-13 20:45:00+00:00", "total_load": 1000.0, "4B8-tmpf": 55.0},
+        {"dt": "2026-04-13 20:50:00+00:00", "total_load": 1001.0, "4B8-tmpf": 56.0},
+        {"dt": "2026-04-13 20:55:00+00:00", "total_load": 1002.0, "4B8-tmpf": 57.0},
+    ]
+    client = _FakeSupabaseClient({"train_table": train_rows})
+    frame = fetch_supabase_train_all(client, schema="hackathon", table="train_table", page_size=2)
+    assert list(frame.columns)[0] == "dt"
+    assert "Total Load" in frame.columns
+    assert "total_load" not in frame.columns
+    assert len(frame) == 3
+    assert str(frame["dt"].iloc[0]) == "2026-04-13 20:45:00"
+
+
+def test_fetch_supabase_test_row_prefers_requested_horizon():
+    rows = [
+        {"dt": "2026-04-13 20:45:00", "horizon_min": 10, "4B8-tmpf": 50.0},
+        {"dt": "2026-04-13 20:45:00", "horizon_min": 5, "4B8-tmpf": 51.0},
+    ]
+    client = _FakeSupabaseClient({"test_table": rows})
+    row = fetch_supabase_test_row(
+        client,
+        schema="hackathon",
+        table="test_table",
+        dt_target="2026-04-13 20:45:00+00:00",
+        horizon_min=5,
+    )
+    assert row is not None
+    assert int(row["horizon_min"]) == 5
+
+
+def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):
+    train_rows = []
+    start = datetime(2026, 4, 13, 20, 0, 0)
+    for i in range(50):
+        dt = start + timedelta(minutes=5 * i)
+        train_rows.append(
+            {
+                "dt": dt.strftime("%Y-%m-%d %H:%M:%S+00:00"),
+                "total_load": 1000 + i,
+                "4B8-tmpf": 55 + (i % 3),
+                "4B8-dwpf": 45 + (i % 2),
+            }
+        )
+
+    def _fake_create_client(url, key):
+        assert url == "https://example.supabase.co"
+        assert key == "sb_publishable_test"
+        return object()
+
+    def _fake_fetch_train_all(client, schema, table, page_size):
+        assert schema == "hackathon"
+        assert table == "hackathon-train-data"
+        assert page_size == 1000
+        assert client is not None
+        return pd.DataFrame(train_rows).rename(columns={"total_load": "Total Load"}).assign(
+            dt=lambda d: pd.to_datetime(d["dt"], utc=True).dt.tz_localize(None)
+        )
+
+    monkeypatch.setattr("miner_model_energy.pipeline.create_supabase_data_client", _fake_create_client)
+    monkeypatch.setattr("miner_model_energy.pipeline.fetch_supabase_train_all", _fake_fetch_train_all)
+
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=tmp_path / "unused-train.csv",
+        test_path=tmp_path / "unused-test.csv",
+        feature_patch={"include_weather_suffix_groups": ["tmpf", "dwpf"]},
+        data_patch={
+            "source": "supabase",
+            "train_csv": None,
+            "test_csv": None,
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_publishable_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+            "forecast_horizon_min": 5,
+            "supabase_page_size": 1000,
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+    train_model_frame, test_frame, features = prepare_training_data(cfg, show_progress=False)
+
+    assert len(train_model_frame) > 0
+    assert len(test_frame) == 1
+    assert "Total Load" in train_model_frame.columns
+    assert "4B8-tmpf" in features
 
 
 if __name__ == "__main__":

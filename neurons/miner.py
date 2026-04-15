@@ -15,6 +15,7 @@ from miner_model_energy.inference_runtime import (
     AdvancedModelPredictor,
     BaselineMovingAveragePredictor,
     PredictorRouter,
+    SupabaseLiveAdvancedPredictor,
 )
 from miner_model_energy.ml_config import load_model_config
 from miner_model_energy.pipeline import persist_training_result, train_model
@@ -41,6 +42,7 @@ _SECTION_WIDTH = 72
 class PreflightResult:
     mode: str
     training_result: object | None = None
+    model_config: object | None = None
 
 
 def _section(title: str) -> None:
@@ -189,6 +191,13 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
     except Exception as exc:
         print(f"  Failed to load model config: {exc}")
         return PreflightResult(mode="baseline")
+    if cfg.data.get("source") == "supabase":
+        _sub(
+            "Data source: SUPABASE "
+            f"(schema={cfg.data['supabase_schema']}, "
+            f"train_table={cfg.data['supabase_train_table']}, "
+            f"test_table={cfg.data['supabase_test_table']})"
+        )
 
     while True:
         selected_model = _ask_model_type_preflight()
@@ -210,7 +219,11 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
             _section("Ready")
             _sub(f"Deployed advanced model: {selected_model}")
             print()
-            return PreflightResult(mode=f"advanced:{selected_model}", training_result=result)
+            return PreflightResult(
+                mode=f"advanced:{selected_model}",
+                training_result=result,
+                model_config=cfg,
+            )
 
         next_step = _ask_after_deploy_decline()
         if next_step == "baseline":
@@ -256,8 +269,14 @@ class Miner(BaseMinerNeuron):
         self._add_test_noise = getattr(self.config, "test", False)
         self.predictor_router = PredictorRouter(BaselineMovingAveragePredictor(N_STEPS))
         if preflight_result and preflight_result.training_result is not None:
+            predictor = AdvancedModelPredictor(result=preflight_result.training_result)
+            if preflight_result.model_config and preflight_result.model_config.data.get("source") == "supabase":
+                predictor = SupabaseLiveAdvancedPredictor(
+                    result=preflight_result.training_result,
+                    config=preflight_result.model_config,
+                )
             self.predictor_router.set_predictor(
-                AdvancedModelPredictor(result=preflight_result.training_result),
+                predictor,
                 mode=preflight_result.mode,
             )
             bt.logging.success(f"Using preflight-deployed model mode: {preflight_result.mode}")

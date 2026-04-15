@@ -36,6 +36,13 @@ def _require_path(path_value: str, key: str) -> str:
     return str(path)
 
 
+def _clean_optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _normalize_include_weather_suffix_groups(value: Any) -> List[str]:
     """Empty list = strip all raw *-tmpf / *-dwpf / … columns. Non-empty = whitelist those suffixes only."""
     if value is None:
@@ -105,10 +112,42 @@ def load_model_config(path: str) -> ModelConfig:
     models = raw.get("models", {})
     persistence = raw.get("persistence", {})
 
-    train_path = _require_path(data.get("train_csv", ""), "data.train_csv")
-    test_path = _require_path(data.get("test_csv", ""), "data.test_csv")
-    data["train_csv"] = train_path
-    data["test_csv"] = test_path
+    source = str(data.get("source", "csv")).strip().lower()
+    if source not in {"csv", "supabase"}:
+        raise ValueError("`data.source` must be one of: csv, supabase.")
+    data["source"] = source
+
+    train_csv = _clean_optional_str(data.get("train_csv"))
+    test_csv = _clean_optional_str(data.get("test_csv"))
+    if source == "csv":
+        data["train_csv"] = _require_path(train_csv or "", "data.train_csv")
+        data["test_csv"] = _require_path(test_csv or "", "data.test_csv")
+    else:
+        if train_csv:
+            data["train_csv"] = _require_path(train_csv, "data.train_csv")
+        else:
+            data["train_csv"] = None
+        if test_csv:
+            data["test_csv"] = _require_path(test_csv, "data.test_csv")
+        else:
+            data["test_csv"] = None
+
+        required_supabase_keys = (
+            "supabase_url",
+            "supabase_key",
+            "supabase_schema",
+            "supabase_train_table",
+            "supabase_test_table",
+        )
+        for key in required_supabase_keys:
+            value = _clean_optional_str(data.get(key))
+            if not value:
+                raise ValueError(f"`data.{key}` is required when `data.source: supabase`.")
+            data[key] = value
+        data["forecast_horizon_min"] = int(data.get("forecast_horizon_min", 5))
+        data["supabase_page_size"] = int(data.get("supabase_page_size", 1000))
+        if data["supabase_page_size"] <= 0:
+            raise ValueError("`data.supabase_page_size` must be > 0.")
 
     validation_split = float(training.get("validation_split", 0.2))
     if validation_split <= 0.0 or validation_split >= 0.5:

@@ -110,7 +110,7 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
         out["minute_of_day_sin"] = np.sin(2 * np.pi * minute_of_day / 1440.0)
         out["minute_of_day_cos"] = np.cos(2 * np.pi * minute_of_day / 1440.0)
 
-    tmpf_cols, dwpf_cols, relh_cols, sped_cols = _weather_column_groups(out.columns)
+    tmpf_cols, dwpf_cols, relh_cols, sped_cols, _drct_cols = _weather_column_groups(out.columns)
 
     if feature_cfg.get("use_station_agg_features", False):
         if tmpf_cols:

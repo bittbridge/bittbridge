@@ -17,7 +17,7 @@ from .artifacts import (
     write_config_snapshot,
     write_manifest,
 )
-from .data_io import TARGET_COLUMN, load_train_test
+from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN, load_train_test
 from .features import (
     add_engineered_features,
     add_test_load_features_from_history,
@@ -31,6 +31,13 @@ from .models_linear import LinearBundle, load_linear, predict_linear, save_linea
 from .models_lstm import LSTM_SCALER_FILENAME, load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
 from .models_rnn import RNN_SCALER_FILENAME, load_rnn, predict_rnn, save_rnn, train_rnn
 from .split import temporal_train_val_split
+from .supabase_io import (
+    create_supabase_data_client,
+    fetch_supabase_test_row,
+    fetch_supabase_train_all,
+    fetch_supabase_train_tail,
+    normalize_supabase_test_frame,
+)
 
 
 @dataclass
@@ -67,8 +74,63 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     return {"rmse": rmse, "mae": mae, "mape": mape, "r2": r2}
 
 
-def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
-    train, test = load_train_test(config.data["train_csv"], config.data["test_csv"])
+def _load_supabase_train_test(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    data_cfg = config.data
+    schema = data_cfg["supabase_schema"]
+    train_table = data_cfg["supabase_train_table"]
+    test_table = data_cfg["supabase_test_table"]
+    try:
+        client = create_supabase_data_client(data_cfg["supabase_url"], data_cfg["supabase_key"])
+        train = fetch_supabase_train_all(
+            client,
+            schema=schema,
+            table=train_table,
+            page_size=int(data_cfg.get("supabase_page_size", 1000)),
+        )
+    except Exception as exc:
+        raise ValueError(
+            "Supabase training load failed "
+            f"(schema={schema}, train_table={train_table}, test_table={test_table}): {exc}"
+        ) from exc
+    test_csv = data_cfg.get("test_csv")
+    if test_csv:
+        test = pd.read_csv(test_csv)
+        test[TIMESTAMP_COLUMN] = pd.to_datetime(test[TIMESTAMP_COLUMN], errors="raise")
+        test = test.sort_values(TIMESTAMP_COLUMN).reset_index(drop=True)
+        return train, test
+
+    if len(train) < 2:
+        raise ValueError("Supabase train data needs at least 2 rows to derive a fallback test row.")
+    test = train.tail(1).drop(columns=[TARGET_COLUMN], errors="ignore").copy()
+    return train, test
+
+
+def _load_train_test_by_source(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    source = config.data.get("source", "csv")
+    if source == "supabase":
+        return _load_supabase_train_test(config)
+    return load_train_test(config.data["train_csv"], config.data["test_csv"])
+
+
+def prepare_training_data(
+    config: ModelConfig,
+    show_progress: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
+    source = config.data.get("source", "csv")
+    if source == "supabase" and show_progress:
+        print(
+            "  [train]     Data source: SUPABASE "
+            f"(schema={config.data['supabase_schema']}, "
+            f"train_table={config.data['supabase_train_table']}, "
+            f"test_table={config.data['supabase_test_table']})",
+            flush=True,
+        )
+    train, test = _load_train_test_by_source(config)
+    if source == "supabase" and show_progress:
+        print(
+            f"  [train]     Supabase data pulled: train_shape={train.shape}, test_shape={test.shape}",
+            flush=True,
+        )
     suffix_whitelist = config.features.get("include_weather_suffix_groups")
     train = filter_weather_suffix_columns(train, suffix_whitelist)
     test = filter_weather_suffix_columns(test, suffix_whitelist)
@@ -107,6 +169,12 @@ def prepare_training_data(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFra
     train_model = train.dropna(subset=required_train_cols).reset_index(drop=True)
     if train_model.empty:
         raise ValueError("Training frame is empty after feature engineering and dropna.")
+    if source == "supabase" and show_progress:
+        print(
+            f"  [train]     Features applied: train_shape={train_model.shape}, "
+            f"test_shape={test.shape}, n_features={len(features)}",
+            flush=True,
+        )
     return train_model, test, features
 
 
@@ -118,7 +186,7 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     t0 = time.perf_counter()
     if show_progress:
         print("  [train] (1/4) Loading CSVs and building features…", flush=True)
-    train_model, test, features = prepare_training_data(config)
+    train_model, test, features = prepare_training_data(config, show_progress=show_progress)
     t1 = time.perf_counter()
     if show_progress:
         print(
@@ -286,6 +354,132 @@ def predict_single_test_row(result: TrainingResult) -> float:
     elif result.model_type == "rnn":
         seq_2d = build_sequence_inference_matrix(result)
         pred = predict_rnn(result.model_bundle, seq_2d)[0]
+    else:
+        raise ValueError(f"Unsupported model type: {result.model_type}")
+    return float(pred)
+
+
+def _required_history_rows_for_live(result: TrainingResult, config: ModelConfig) -> int:
+    feats_cfg = config.features
+    needed = 32
+    if result.model_type in {"lstm", "rnn"}:
+        needed = max(needed, int(getattr(result.model_bundle, "n_steps", 12)))
+    if feats_cfg.get("use_load_lags", False):
+        lag_steps = [int(v) for v in feats_cfg.get("load_lag_steps", [])]
+        needed = max(needed, max(lag_steps, default=1) + 2)
+    if feats_cfg.get("use_load_rolling", False):
+        rolling = [int(v) for v in feats_cfg.get("rolling_load_windows", [])]
+        needed = max(needed, max(rolling, default=1) + 2, 16)
+    if feats_cfg.get("use_load_delta", False) or feats_cfg.get("use_load_rolling", False):
+        needed = max(needed, 16)
+    return int(needed)
+
+
+def _build_live_sequence_matrix(
+    history_features: pd.DataFrame,
+    test_row: pd.DataFrame,
+    features: List[str],
+    n_steps: int,
+) -> np.ndarray:
+    prior = history_features[features].dropna().astype(float).to_numpy()
+    need_prior = n_steps - 1
+    if prior.shape[0] < need_prior:
+        raise ValueError(
+            f"Live sequence inference requires {need_prior} prior feature rows, got {prior.shape[0]}."
+        )
+    x_test = test_row[features].astype(float).to_numpy()
+    return np.vstack([prior[-need_prior:], x_test])
+
+
+def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp_str: str) -> float:
+    source = config.data.get("source", "csv")
+    if source != "supabase":
+        return predict_single_test_row(result)
+
+    data_cfg = config.data
+    schema = data_cfg["supabase_schema"]
+    train_table = data_cfg["supabase_train_table"]
+    test_table = data_cfg["supabase_test_table"]
+    horizon = int(data_cfg.get("forecast_horizon_min", 5))
+    page_size = int(data_cfg.get("supabase_page_size", 1000))
+
+    try:
+        client = create_supabase_data_client(data_cfg["supabase_url"], data_cfg["supabase_key"])
+        needed_rows = _required_history_rows_for_live(result, config)
+        history = fetch_supabase_train_tail(client, schema=schema, table=train_table, n_rows=needed_rows)
+        forecast_row = fetch_supabase_test_row(
+            client,
+            schema=schema,
+            table=test_table,
+            dt_target=timestamp_str,
+            horizon_min=horizon,
+            nearest_fallback_minutes=5,
+        )
+    except Exception as exc:
+        raise ValueError(
+            "Supabase live inference failed while fetching data "
+            f"(schema={schema}, train_table={train_table}, test_table={test_table}, "
+            f"timestamp={timestamp_str}, horizon_min={horizon}, page_size={page_size}): {exc}"
+        ) from exc
+
+    if forecast_row is None:
+        raise ValueError(
+            "Supabase live inference found no forecast row "
+            f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
+        )
+
+    forecast_frame = normalize_supabase_test_frame(pd.DataFrame([forecast_row]))
+    suffix_whitelist = config.features.get("include_weather_suffix_groups")
+    history_filtered = filter_weather_suffix_columns(history, suffix_whitelist)
+    forecast_filtered = filter_weather_suffix_columns(forecast_frame, suffix_whitelist)
+
+    history_features = add_engineered_features(history_filtered, config.features)
+    test_features = add_engineered_features(forecast_filtered, config.features)
+    feats_cfg = config.features
+    if (
+        feats_cfg.get("use_load_lags", False)
+        or feats_cfg.get("use_load_rolling", False)
+        or feats_cfg.get("use_load_delta", False)
+    ):
+        test_features = add_test_load_features_from_history(test_features, history_filtered, feats_cfg)
+
+    missing = [c for c in result.features if c not in test_features.columns]
+    if missing:
+        raise ValueError(
+            "Live forecast row is missing trained feature columns: "
+            + ", ".join(missing[:20])
+            + (" ..." if len(missing) > 20 else "")
+        )
+    missing_history = [c for c in result.features if c not in history_features.columns]
+    if missing_history:
+        raise ValueError(
+            "Live history rows are missing trained feature columns: "
+            + ", ".join(missing_history[:20])
+            + (" ..." if len(missing_history) > 20 else "")
+        )
+
+    if result.model_type == "linear":
+        pred = predict_linear(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
+    elif result.model_type == "cart":
+        pred = predict_cart(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
+    elif result.model_type == "lstm":
+        n_steps = int(getattr(result.model_bundle, "n_steps", 12))
+        seq = _build_live_sequence_matrix(
+            history_features=history_features,
+            test_row=test_features,
+            features=result.features,
+            n_steps=n_steps,
+        )
+        pred = predict_lstm(result.model_bundle, seq)[0]
+    elif result.model_type == "rnn":
+        n_steps = int(getattr(result.model_bundle, "n_steps", 12))
+        seq = _build_live_sequence_matrix(
+            history_features=history_features,
+            test_row=test_features,
+            features=result.features,
+            n_steps=n_steps,
+        )
+        pred = predict_rnn(result.model_bundle, seq)[0]
     else:
         raise ValueError(f"Unsupported model type: {result.model_type}")
     return float(pred)

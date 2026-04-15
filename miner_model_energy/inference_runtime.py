@@ -7,7 +7,8 @@ from typing import Optional
 from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
 from bittbridge.utils.timestamp import get_now
 
-from .pipeline import TrainingResult, predict_single_test_row
+from .ml_config import ModelConfig
+from .pipeline import TrainingResult, predict_for_timestamp, predict_single_test_row
 
 
 def _get_latest_load_values(n_steps: int) -> Optional[list]:
@@ -42,6 +43,15 @@ class AdvancedModelPredictor:
     def predict(self, timestamp: str) -> Optional[float]:
         del timestamp
         return predict_single_test_row(self.result)
+
+
+@dataclass
+class SupabaseLiveAdvancedPredictor:
+    result: TrainingResult
+    config: ModelConfig
+
+    def predict(self, timestamp: str) -> Optional[float]:
+        return predict_for_timestamp(self.result, self.config, timestamp)
 
 
 class PredictorRouter:

@@ -87,9 +87,19 @@ persistence:
   save_on_deploy: true
 
 # ------------------------------------------------------------
-# DATA CONFIGURATION - DON NOT TOUCH THIS SECTION
+# DATA CONFIGURATION
 # ------------------------------------------------------------
-# CSV paths resolved at config load; files must exist or startup fails.
+# source:
+#   - csv: uses train_csv + test_csv files
+#   - supabase: uses Supabase tables below (train_csv/test_csv optional)
 data:
+  source: csv
   train_csv: miner_model_energy/TRAIN-updated-train-data_3-25-26.csv
   test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
+  supabase_url: https://lparhzmnwbslsskxswfr.supabase.co
+  supabase_key: sb_publishable_7w6NQnZBm4U9-lwlwVVsCg_6l1z0vgm
+  supabase_schema: hackathon
+  supabase_train_table: hackathon-train-data
+  supabase_test_table: hackathon-test-data
+  forecast_horizon_min: 5
+  supabase_page_size: 1000
