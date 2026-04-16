@@ -38,7 +38,7 @@ from miner_model_energy.storage_train_io import (
 
 # Number of 5-minute steps for moving average (12 = 1 hour)
 N_STEPS = 12
-DEFAULT_PARAMS_PATH = "miner_model_energy/model_params.yaml"
+DEFAULT_PARAMS_PATH = "model_params.yaml"
 _SECTION_WIDTH = 72
 
 

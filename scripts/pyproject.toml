@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bittbridge"
+description = "bittbridge"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "uconn.com" }]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/bittbridge/bittbridge"
+
+[tool.setuptools.dynamic]
+version = { attr = "bittbridge.__version__" }
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["."]

@@ -44,7 +44,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 
 1. **Clone:** `git clone https://github.com/bittbridge/bittbridge.git`
 2. **ISO-NE:** [Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false) → put username/password in `.env` (from `.env.example`)
-3. **Check API:** `python test.py`
+3. **Check API:** `python scripts/check_iso_ne_api.py`
 4. **Follow the four steps below** (GCP VM + moving average miner).
 
 ---

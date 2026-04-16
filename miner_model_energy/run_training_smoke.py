@@ -11,7 +11,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="miner_model_energy/model_params.yaml",
+        default="model_params.yaml",
         help="Path to model config yaml.",
     )
     parser.add_argument(

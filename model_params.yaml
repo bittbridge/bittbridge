@@ -52,7 +52,7 @@ models:
     min_samples_leaf: 5
   
   lstm:
-    n_steps: 12
+    n_steps: 1
     units: 32
     dropout: 0.1
     epochs: 5
@@ -70,7 +70,7 @@ models:
 
   # Keras SimpleRNN (vanilla RNN). Same hyperparameter shape as lstm; see lstm block for OOM hints.
   rnn:
-    n_steps: 12
+    n_steps: 1
     units: 32
     dropout: 0.1
     epochs: 5

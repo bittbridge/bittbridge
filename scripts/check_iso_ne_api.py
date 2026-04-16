@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Test script to verify ISO-NE API access and credentials.
+Verify ISO-NE API access and credentials.
 
 Uses the same logic as miner and validator:
 - Miner-style: fetch latest N LoadMw values, compute MA
 - Validator-style: get actual LoadMw for a specific 5-min timestamp
 
 Run after setting .env (copy from .env.example, set ISO_NE_USERNAME and ISO_NE_PASSWORD).
-Usage: python test.py
+
+Usage (from repo root ``bittbridge/``): ``python scripts/check_iso_ne_api.py``
 """
 
 import os
@@ -17,15 +18,16 @@ from datetime import datetime, timedelta, timezone
 # Load .env before importing bittbridge (which may use env vars)
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
 
-# Add bittbridge to path if running from project root
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
 
 from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load, get_load_mw_for_timestamp
-from bittbridge.utils.timestamp import get_now, round_to_interval, to_str, get_before
+from bittbridge.utils.timestamp import get_before, round_to_interval, to_str
 
 N_STEPS = 12
 

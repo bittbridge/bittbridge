@@ -99,7 +99,7 @@ After you train and deploy, the advanced miner path does **not** rely only on st
 4. **Automatic refresh**  
    You do not manually reload the database: edge functions and cron jobs keep inserting/updating rows. The miner simply reads the current state when a challenge arrives.
 
-Together, this is the end-to-end **train once (often from storage CSVs), answer many times with live Supabase reads** workflow. Names in YAML (`supabase_train_table` / `supabase_test_table`) refer to **history tail** vs **target forecast row** in code, not the words “train” or “test” in the table names—see defaults in `miner_model_energy/model_params.yaml`.
+Together, this is the end-to-end **train once (often from storage CSVs), answer many times with live Supabase reads** workflow. Names in YAML (`supabase_train_table` / `supabase_test_table`) refer to **history tail** vs **target forecast row** in code, not the words “train” or “test” in the table names—see defaults in `model_params.yaml` (repo root under `bittbridge/`).
 
 ---
 
