@@ -19,7 +19,10 @@ from miner_model_energy.inference_runtime import (
 )
 from miner_model_energy.ml_config import load_model_config
 from miner_model_energy.pipeline import persist_training_result, train_model
-from miner_model_energy.storage_train_io import storage_cache_exists
+from miner_model_energy.storage_train_io import (
+    storage_cache_exists,
+    storage_cache_last_updated_label,
+)
 
 # ---------------------------
 # Miner Forward Logic for New England Energy Demand (LoadMw) Prediction
@@ -219,13 +222,16 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
             )
         elif cfg.data.get("source") == "supabase_storage":
             cache_ok = storage_cache_exists(cfg)
+            _section("Supabase Storage training cache")
             if cache_ok:
+                _sub(f"Last update: {storage_cache_last_updated_label(cfg)}")
+                _sub("Refreshing training data usually takes 2-3 minutes.")
                 storage_force_refresh_decision = _ask_yes_no_preflight(
                     "Update training data now?", default_yes=False
                 )
             else:
-                _section("Supabase Storage training cache")
                 _sub("First-time training data fetch (~2-3m).")
+                _sub("Fetching training data and building local cache usually takes 2-3 minutes.")
                 storage_force_refresh_decision = False
 
         while True:

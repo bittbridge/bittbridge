@@ -419,6 +419,23 @@ def test_fetch_supabase_test_row_prefers_requested_horizon():
     assert int(row["horizon_min"]) == 5
 
 
+def test_fetch_supabase_test_row_falls_back_to_local_wall_clock_exact():
+    rows = [
+        {"dt": "2026-04-13 10:35:00", "horizon_min": 5, "4B8-tmpf": 51.0},
+    ]
+    client = _FakeSupabaseClient({"test_table": rows})
+    row = fetch_supabase_test_row(
+        client,
+        schema="hackathon",
+        table="test_table",
+        dt_target="2026-04-13T10:35:00-04:00",
+        horizon_min=5,
+    )
+    assert row is not None
+    assert row["dt"] == "2026-04-13 10:35:00"
+    assert int(row["horizon_min"]) == 5
+
+
 def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):
     train_rows = []
     start = datetime(2026, 4, 13, 20, 0, 0)

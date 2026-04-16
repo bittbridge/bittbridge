@@ -57,8 +57,35 @@ def parse_timestamp_for_supabase(timestamp_str: str) -> pd.Timestamp:
     return ts.tz_convert("UTC").tz_localize(None)
 
 
+def timestamp_candidates_for_supabase(timestamp_str: str) -> list[pd.Timestamp]:
+    """
+    Build timestamp candidates for querying forecast rows.
+
+    Primary candidate is UTC-normalized naive timestamp (the canonical path).
+    Secondary candidate keeps local wall-clock time (naive) for compatibility
+    with rows written with an unintended timezone conversion.
+    """
+    raw = pd.to_datetime(timestamp_str, errors="raise")
+    candidates: list[pd.Timestamp] = []
+
+    if raw.tzinfo is None:
+        candidates.append(raw)
+    else:
+        candidates.append(raw.tz_convert("UTC").tz_localize(None))
+        candidates.append(raw.tz_localize(None))
+
+    unique: list[pd.Timestamp] = []
+    seen: set[pd.Timestamp] = set()
+    for ts in candidates:
+        if ts in seen:
+            continue
+        seen.add(ts)
+        unique.append(ts)
+    return unique
+
+
 def format_timestamp_for_supabase(timestamp_str: str) -> str:
-    ts = parse_timestamp_for_supabase(timestamp_str)
+    ts = timestamp_candidates_for_supabase(timestamp_str)[0]
     return ts.strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -108,10 +135,6 @@ def fetch_supabase_test_row(
     horizon_min: int,
     nearest_fallback_minutes: int | None = None,
 ) -> Dict[str, Any] | None:
-    dt_exact = format_timestamp_for_supabase(dt_target)
-    response = client.schema(schema).table(table).select("*").eq(TIMESTAMP_COLUMN, dt_exact).execute()
-    rows = response.data or []
-
     def _pick_row(candidates: list[Dict[str, Any]]) -> Dict[str, Any] | None:
         if not candidates:
             return None
@@ -128,24 +151,33 @@ def fetch_supabase_test_row(
                 return matches[0]
         return candidates[0]
 
-    picked = _pick_row(rows)
-    if picked is not None:
-        return picked
+    candidate_ts = timestamp_candidates_for_supabase(dt_target)
+    candidate_exact = [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in candidate_ts]
+
+    for dt_exact in candidate_exact:
+        response = client.schema(schema).table(table).select("*").eq(TIMESTAMP_COLUMN, dt_exact).execute()
+        rows = response.data or []
+        picked = _pick_row(rows)
+        if picked is not None:
+            return picked
 
     if nearest_fallback_minutes is None or nearest_fallback_minutes <= 0:
         return None
 
-    target = parse_timestamp_for_supabase(dt_target)
-    start = (target - timedelta(minutes=int(nearest_fallback_minutes))).strftime("%Y-%m-%d %H:%M:%S")
-    end = (target + timedelta(minutes=int(nearest_fallback_minutes))).strftime("%Y-%m-%d %H:%M:%S")
-    around = (
-        client.schema(schema)
-        .table(table)
-        .select("*")
-        .gte(TIMESTAMP_COLUMN, start)
-        .lte(TIMESTAMP_COLUMN, end)
-        .order(TIMESTAMP_COLUMN, desc=False)
-        .execute()
-    )
-    nearby_rows = around.data or []
-    return _pick_row(nearby_rows)
+    for target in candidate_ts:
+        start = (target - timedelta(minutes=int(nearest_fallback_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+        end = (target + timedelta(minutes=int(nearest_fallback_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+        around = (
+            client.schema(schema)
+            .table(table)
+            .select("*")
+            .gte(TIMESTAMP_COLUMN, start)
+            .lte(TIMESTAMP_COLUMN, end)
+            .order(TIMESTAMP_COLUMN, desc=False)
+            .execute()
+        )
+        nearby_rows = around.data or []
+        picked = _pick_row(nearby_rows)
+        if picked is not None:
+            return picked
+    return None

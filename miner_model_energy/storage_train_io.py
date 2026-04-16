@@ -45,6 +45,36 @@ def storage_cache_exists(config: ModelConfig) -> bool:
     return cache_path.exists()
 
 
+def _parse_manifest_downloaded_at(manifest_path: Path) -> datetime | None:
+    if not manifest_path.exists():
+        return None
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    downloaded_at = payload.get("downloaded_at")
+    if not isinstance(downloaded_at, str) or not downloaded_at.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(downloaded_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def storage_cache_last_updated_label(config: ModelConfig) -> str:
+    cache_path, manifest_path = storage_cache_paths(config)
+    parsed = _parse_manifest_downloaded_at(manifest_path)
+    if parsed is not None:
+        return parsed.strftime("%Y-%m-%d %H:%M:%S UTC")
+    if cache_path.exists():
+        mtime = datetime.fromtimestamp(cache_path.stat().st_mtime, tz=timezone.utc)
+        return mtime.strftime("%Y-%m-%d %H:%M:%S UTC")
+    return "unknown"
+
+
 def _ensure_normalized_train_frame(frame: pd.DataFrame) -> pd.DataFrame:
     out = frame.copy()
     if "total_load" in out.columns and TARGET_COLUMN not in out.columns:
@@ -120,6 +150,7 @@ def load_train_from_storage_parts(config: ModelConfig, force_refresh: bool) -> p
             "  [train]     Fetching training data from Supabase Storage and building local cache…",
             flush=True,
         )
+        print("  [train]     This update usually takes 2-3 minutes.", flush=True)
         merged, manifest = _build_train_cache_from_storage(config)
         _write_cached_train_frame(cache_path, merged)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
