@@ -58,7 +58,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 | **3** | [Wallets and tokens](docs/guide/03-wallets-and-tokens.md) — wallet, tTAO, register, **save UID**, `.env` |
 | **4** | [Run miner](docs/guide/04-run-miner.md) — moving average in `neurons/miner.py` |
 
-**Optional:** [Update and restart](docs/guide/update-and-restart.md) when the repo changes. **Optional:** [Incentive mechanism](docs/guide/incentive-mechanism.md) (how rewards work).
+**Optional:** [Update and restart](docs/guide/update-and-restart.md) when the repo changes. **Optional:** [Incentive mechanism](docs/guide/incentive-mechanism.md) (how rewards work). **Optional:** [App workflow and Supabase](docs/guide/app-workflow-supabase.md) (plain-language data + prediction flow).
 
 **Advanced** (not required for now): [docs/guide/advanced](docs/guide/advanced/README.md)
 

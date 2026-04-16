@@ -18,9 +18,11 @@ from neurons import miner as miner_module
 from miner_model_energy.artifacts import load_manifest
 from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
-from miner_model_energy.ml_config import load_model_config
+from miner_model_energy.ml_config import ModelConfig, load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
 from miner_model_energy.pipeline import (
+    TrainingResult,
+    _required_history_rows_for_live,
     load_training_bundle_from_manifest,
     prepare_training_data,
     persist_training_result,
@@ -439,6 +441,62 @@ def test_fetch_supabase_test_row_falls_back_to_local_wall_clock_exact():
     assert row is not None
     assert row["dt"] == "2026-04-13 10:35:00"
     assert int(row["horizon_min"]) == 5
+
+
+def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window():
+    """After shift(max_lag), only tail rows are non-NaN in load_lag_*; fetch enough for RNN window."""
+
+    class _Bundle:
+        n_steps = 12
+
+    result = TrainingResult(
+        model_type="rnn",
+        model_bundle=_Bundle(),
+        metrics={},
+        features=[],
+        train_frame=pd.DataFrame(),
+        test_frame=pd.DataFrame(),
+        shapes={},
+    )
+    cfg = ModelConfig(
+        data={},
+        features={
+            "use_load_lags": True,
+            "load_lag_steps": [12, 24],
+        },
+        training={},
+        models={},
+        persistence={},
+    )
+    needed = _required_history_rows_for_live(result, cfg)
+    assert needed >= 24 + 11 + 8  # max_lag + (n_steps - 1) + live_seq_buffer
+
+
+def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail():
+    class _LinearBundle:
+        pass
+
+    result = TrainingResult(
+        model_type="linear",
+        model_bundle=_LinearBundle(),
+        metrics={},
+        features=[],
+        train_frame=pd.DataFrame(),
+        test_frame=pd.DataFrame(),
+        shapes={},
+    )
+    cfg = ModelConfig(
+        data={},
+        features={
+            "use_load_lags": True,
+            "load_lag_steps": [12, 24],
+        },
+        training={},
+        models={},
+        persistence={},
+    )
+    needed = _required_history_rows_for_live(result, cfg)
+    assert needed == 32
 
 
 def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):

@@ -379,11 +379,19 @@ def predict_single_test_row(result: TrainingResult) -> float:
 def _required_history_rows_for_live(result: TrainingResult, config: ModelConfig) -> int:
     feats_cfg = config.features
     needed = 32
+    n_steps_seq: int | None = None
     if result.model_type in {"lstm", "rnn"}:
-        needed = max(needed, int(getattr(result.model_bundle, "n_steps", 12)))
+        n_steps_seq = int(getattr(result.model_bundle, "n_steps", 12))
+        needed = max(needed, n_steps_seq)
     if feats_cfg.get("use_load_lags", False):
         lag_steps = [int(v) for v in feats_cfg.get("load_lag_steps", [])]
-        needed = max(needed, max(lag_steps, default=1) + 2)
+        max_lag = max(lag_steps, default=1)
+        needed = max(needed, max_lag + 2)
+        # shift(max_lag) leaves the first max_lag rows NaN in load_lag_*; dropna() then
+        # needs enough tail rows for (n_steps - 1) prior timesteps for LSTM/RNN live inference.
+        if n_steps_seq is not None:
+            live_seq_buffer = 8
+            needed = max(needed, max_lag + (n_steps_seq - 1) + live_seq_buffer)
     if feats_cfg.get("use_load_rolling", False):
         rolling = [int(v) for v in feats_cfg.get("rolling_load_windows", [])]
         needed = max(needed, max(rolling, default=1) + 2, 16)

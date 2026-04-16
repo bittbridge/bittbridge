@@ -22,13 +22,13 @@ def _require_keras():
     try:
         from tensorflow.keras import Sequential
         from tensorflow.keras.callbacks import EarlyStopping
-        from tensorflow.keras.layers import Dense, Dropout, SimpleRNN
+        from tensorflow.keras.layers import Dense, Dropout, Input, SimpleRNN
         from tensorflow.keras.optimizers import Adam
     except Exception as exc:
         raise RuntimeError(
             "RNN requested but TensorFlow/Keras is unavailable. Install tensorflow."
         ) from exc
-    return Sequential, SimpleRNN, Dense, Dropout, Adam, EarlyStopping
+    return Sequential, SimpleRNN, Dense, Dropout, Input, Adam, EarlyStopping
 
 
 def _set_random_seeds(seed: int) -> None:
@@ -52,7 +52,7 @@ def train_rnn(
     y_val: Optional[np.ndarray] = None,
 ) -> RnnBundle:
     _set_random_seeds(int(random_state))
-    Sequential, SimpleRNN, Dense, Dropout, Adam, EarlyStopping = _require_keras()
+    Sequential, SimpleRNN, Dense, Dropout, Input, Adam, EarlyStopping = _require_keras()
     n_steps = int(cfg.get("n_steps", 12))
     standardize_inputs = bool(cfg.get("standardize_inputs", False))
     scaler: Optional[object] = None
@@ -93,7 +93,8 @@ def train_rnn(
     early_patience = int(cfg.get("early_stopping_patience", 5))
 
     head_layers = [
-        SimpleRNN(units, input_shape=(n_steps, X_seq.shape[2])),
+        Input(shape=(n_steps, X_seq.shape[2])),
+        SimpleRNN(units),
         Dropout(dropout),
     ]
     if dense_units > 0:
