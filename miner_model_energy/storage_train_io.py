@@ -5,12 +5,15 @@ from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import List, Tuple
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 
 from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN
 from .ml_config import ModelConfig
+
+_EASTERN_TZ = ZoneInfo("America/New_York")
 
 
 def _parquet_supported() -> bool:
@@ -68,10 +71,10 @@ def storage_cache_last_updated_label(config: ModelConfig) -> str:
     cache_path, manifest_path = storage_cache_paths(config)
     parsed = _parse_manifest_downloaded_at(manifest_path)
     if parsed is not None:
-        return parsed.strftime("%Y-%m-%d %H:%M:%S UTC")
+        return parsed.astimezone(_EASTERN_TZ).strftime("%Y-%m-%d %H:%M:%S ET")
     if cache_path.exists():
         mtime = datetime.fromtimestamp(cache_path.stat().st_mtime, tz=timezone.utc)
-        return mtime.strftime("%Y-%m-%d %H:%M:%S UTC")
+        return mtime.astimezone(_EASTERN_TZ).strftime("%Y-%m-%d %H:%M:%S ET")
     return "unknown"
 
 

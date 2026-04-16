@@ -28,7 +28,12 @@ from miner_model_energy.pipeline import (
     train_model,
 )
 from miner_model_energy.supabase_io import fetch_supabase_test_row, fetch_supabase_train_all
-from miner_model_energy.storage_train_io import load_train_from_storage_parts, storage_cache_exists
+from miner_model_energy.storage_train_io import (
+    load_train_from_storage_parts,
+    storage_cache_exists,
+    storage_cache_last_updated_label,
+    storage_cache_paths,
+)
 
 
 def _weather_row(i: int, start: datetime) -> dict:
@@ -567,6 +572,34 @@ def test_storage_cache_miss_downloads_and_writes_cache(tmp_path, monkeypatch):
     df = load_train_from_storage_parts(cfg, force_refresh=False)
     assert len(df) == 3
     assert storage_cache_exists(cfg) is True
+
+
+def test_storage_cache_last_updated_label_uses_eastern_time(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cache_dir = tmp_path / "cache"
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=train_path,
+        test_path=test_path,
+        data_patch={
+            "source": "supabase_storage",
+            "storage_train_base_url": "https://example.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/",
+            "storage_train_parts": ["part-2024-01.csv"],
+            "storage_cache_dir": str(cache_dir),
+            "storage_cache_parquet_name": "train_merged.parquet",
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+    _cache_path, manifest_path = storage_cache_paths(cfg)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text('{"downloaded_at":"2026-04-16T14:15:21+00:00"}', encoding="utf-8")
+
+    assert storage_cache_last_updated_label(cfg) == "2026-04-16 10:15:21 ET"
 
 
 def test_storage_cache_hit_avoids_download(tmp_path, monkeypatch):
