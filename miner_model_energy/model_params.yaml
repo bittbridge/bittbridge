@@ -93,7 +93,7 @@ persistence:
 #   - csv: uses train_csv + test_csv files
 #   - supabase: uses Supabase tables below (train_csv/test_csv optional)
 data:
-  source: csv
+  source: supabase_storage
   train_csv: miner_model_energy/TRAIN-updated-train-data_3-25-26.csv
   test_csv: miner_model_energy/TEST-03-25-2026-5min-single.csv
   supabase_url: https://lparhzmnwbslsskxswfr.supabase.co
@@ -106,6 +106,34 @@ data:
   # Optional training cache based on your public Supabase Storage CSV dumps.
   # Set `data.source: supabase_storage` to enable.
   storage_train_base_url: https://lparhzmnwbslsskxswfr.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/
-  storage_train_parts: [part-2026-04.csv]
+  storage_train_parts:
+    - part-2024-01.csv
+    - part-2024-02.csv
+    - part-2024-03.csv
+    - part-2024-04.csv
+    - part-2024-05.csv
+    - part-2024-06.csv
+    - part-2024-07.csv
+    - part-2024-08.csv
+    - part-2024-09.csv
+    - part-2024-10.csv
+    - part-2024-11.csv
+    - part-2024-12.csv
+    - part-2025-01.csv
+    - part-2025-02.csv
+    - part-2025-03.csv
+    - part-2025-04.csv
+    - part-2025-05.csv
+    - part-2025-06.csv
+    - part-2025-07.csv
+    - part-2025-08.csv
+    - part-2025-09.csv
+    - part-2025-10.csv
+    - part-2025-11.csv
+    - part-2025-12.csv
+    - part-2026-01.csv
+    - part-2026-02.csv
+    - part-2026-03.csv
+    - part-2026-04.csv
   storage_cache_dir: miner_model_energy/cache
   storage_cache_parquet_name: train_merged.parquet

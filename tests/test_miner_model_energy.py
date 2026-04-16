@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from neurons import miner as miner_module
 from miner_model_energy.artifacts import load_manifest
 from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
@@ -664,6 +665,27 @@ def test_storage_cache_rebuild_failure_falls_back_to_existing_cache(tmp_path, mo
     # Force refresh rebuild -> should fall back to cached df1 without raising.
     df2 = load_train_from_storage_parts(cfg, force_refresh=True)
     assert df2.shape == df1.shape
+
+
+def test_ask_model_type_preflight_accepts_exit(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda _prompt: "3")
+    with pytest.raises(miner_module.PreflightExitRequested):
+        miner_module._ask_model_type_preflight()
+
+
+def test_ask_after_deploy_decline_accepts_exit(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda _prompt: "3")
+    choice = miner_module._ask_after_deploy_decline()
+    assert choice == "exit"
+
+
+def test_run_preflight_returns_exit_mode(monkeypatch):
+    def _raise_exit(*_args, **_kwargs):
+        raise miner_module.PreflightExitRequested()
+
+    monkeypatch.setattr(miner_module, "_ask_yes_no_preflight", _raise_exit)
+    result = miner_module.run_preflight(model_params_path="unused.yaml", non_interactive=False)
+    assert result.mode == "exit"
 
 
 if __name__ == "__main__":

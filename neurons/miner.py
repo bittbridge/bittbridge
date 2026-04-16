@@ -46,6 +46,10 @@ class PreflightResult:
     model_config: object | None = None
 
 
+class PreflightExitRequested(Exception):
+    """Raised when user requests to exit during preflight prompts."""
+
+
 def _section(title: str) -> None:
     print()
     print("=" * _SECTION_WIDTH)
@@ -128,6 +132,8 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
         answer = input(f"  {prompt} [{default_hint}] ").strip().lower()
     except EOFError:
         return default_yes
+    if answer in {"3", "exit", "quit", "q"}:
+        raise PreflightExitRequested()
     if not answer:
         return default_yes
     return answer in {"y", "yes"}
@@ -135,11 +141,13 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
 
 def _ask_model_type_preflight() -> str:
     try:
-        answer = input("  Select model (linear / cart / rnn / lstm): ").strip().lower()
+        answer = input("  Select model (linear / cart / rnn / lstm / [3] exit): ").strip().lower()
     except EOFError:
         return "linear"
     if not answer:
         return "linear"
+    if answer in {"3", "exit", "quit", "q"}:
+        raise PreflightExitRequested()
     if answer not in {"linear", "cart", "rnn", "lstm"}:
         print("  Unknown choice; defaulting to linear.")
         return "linear"
@@ -148,25 +156,31 @@ def _ask_model_type_preflight() -> str:
 
 def _ask_after_deploy_decline() -> str:
     """
-    Returns 'baseline' to use moving-average miner, or 'retrain' to pick another advanced model.
+    Returns:
+      - 'baseline' to use moving-average miner
+      - 'retrain' to pick another advanced model
+      - 'exit' to stop before miner startup
     """
     _section("Deploy declined — what next?")
     _sub("  [1]  Continue with baseline moving-average model")
     _sub("  [2]  Train another advanced model (linear / cart / rnn / lstm)")
+    _sub("  [3]  Exit miner")
     print()
     while True:
         try:
-            answer = input("  Choose [1/2]: ").strip().lower()
+            answer = input("  Choose [1/2/3]: ").strip().lower()
         except EOFError:
             return "baseline"
         if answer in ("1", "baseline", "b", "ma"):
             return "baseline"
         if answer in ("2", "retrain", "r", "advanced", "train"):
             return "retrain"
+        if answer in ("3", "exit", "quit", "q"):
+            return "exit"
         if not answer:
-            print("  Please enter 1 or 2.")
+            print("  Please enter 1, 2, or 3.")
             continue
-        print("  Unrecognized choice. Enter 1 for baseline MA or 2 to train another model.")
+        print("  Unrecognized choice. Enter 1 for baseline, 2 to retrain, or 3 to exit.")
 
 
 def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightResult:
@@ -181,81 +195,89 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
         return PreflightResult(mode="baseline")
 
     _section("Miner preflight — model selection")
-    if _ask_yes_no_preflight("Run baseline moving-average miner model?", default_yes=True):
-        _sub("")
-        _sub("Starting miner with baseline moving-average predictions.")
-        print()
-        return PreflightResult(mode="baseline")
-
     try:
-        cfg = load_model_config(model_params_path)
-    except Exception as exc:
-        print(f"  Failed to load model config: {exc}")
-        return PreflightResult(mode="baseline")
-
-    storage_force_refresh_decision = False
-    force_refresh_used = False
-    if cfg.data.get("source") == "supabase":
-        _sub(
-            "Data source: SUPABASE "
-            f"(schema={cfg.data['supabase_schema']}, "
-            f"train_table={cfg.data['supabase_train_table']}, "
-            f"test_table={cfg.data['supabase_test_table']})"
-        )
-    elif cfg.data.get("source") == "supabase_storage":
-        cache_ok = storage_cache_exists(cfg)
-        if cache_ok:
-            storage_force_refresh_decision = _ask_yes_no_preflight(
-                "Update training data now?", default_yes=False
-            )
-        else:
-            _section("Supabase Storage training cache")
-            _sub("First-time training data fetch (~2-3m).")
-            storage_force_refresh_decision = False
-
-    while True:
-        selected_model = _ask_model_type_preflight()
-        try:
-            if cfg.data.get("source") == "supabase_storage":
-                # Only rebuild the cache once per miner run; subsequent models reuse the merged snapshot.
-                cfg.data["storage_force_refresh"] = storage_force_refresh_decision and not force_refresh_used
-            result = train_model(selected_model, cfg)
-        except Exception as exc:
-            print(f"  Training failed: {exc}")
-            if not _ask_yes_no_preflight("Try a different model?", default_yes=True):
-                print()
-                return PreflightResult(mode="baseline")
-            continue
-
-        if cfg.data.get("source") == "supabase_storage":
-            # After the first successful training attempt, never force refresh again in this run.
-            force_refresh_used = True
-            cfg.data["storage_force_refresh"] = False
-
-        _print_ml_report(selected_model, result)
-
-        if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
-            if cfg.persistence.get("save_on_deploy", True):
-                paths = persist_training_result(result, cfg, run_id="miner")
-                _sub(f"Saved artifacts: {paths['artifact_dir']}")
-            _section("Ready")
-            _sub(f"Deployed advanced model: {selected_model}")
-            print()
-            return PreflightResult(
-                mode=f"advanced:{selected_model}",
-                training_result=result,
-                model_config=cfg,
-            )
-
-        next_step = _ask_after_deploy_decline()
-        if next_step == "baseline":
-            _section("Ready")
-            _sub("Using baseline moving-average model.")
+        if _ask_yes_no_preflight("Run baseline moving-average miner model?", default_yes=True):
+            _sub("")
+            _sub("Starting miner with baseline moving-average predictions.")
             print()
             return PreflightResult(mode="baseline")
-        # retrain: loop again with new model choice
-        _section("Train another model")
-        _sub("")
+
+        try:
+            cfg = load_model_config(model_params_path)
+        except Exception as exc:
+            print(f"  Failed to load model config: {exc}")
+            return PreflightResult(mode="baseline")
+
+        storage_force_refresh_decision = False
+        force_refresh_used = False
+        if cfg.data.get("source") == "supabase":
+            _sub(
+                "Data source: SUPABASE "
+                f"(schema={cfg.data['supabase_schema']}, "
+                f"train_table={cfg.data['supabase_train_table']}, "
+                f"test_table={cfg.data['supabase_test_table']})"
+            )
+        elif cfg.data.get("source") == "supabase_storage":
+            cache_ok = storage_cache_exists(cfg)
+            if cache_ok:
+                storage_force_refresh_decision = _ask_yes_no_preflight(
+                    "Update training data now?", default_yes=False
+                )
+            else:
+                _section("Supabase Storage training cache")
+                _sub("First-time training data fetch (~2-3m).")
+                storage_force_refresh_decision = False
+
+        while True:
+            selected_model = _ask_model_type_preflight()
+            try:
+                if cfg.data.get("source") == "supabase_storage":
+                    # Only rebuild the cache once per miner run; subsequent models reuse the merged snapshot.
+                    cfg.data["storage_force_refresh"] = storage_force_refresh_decision and not force_refresh_used
+                result = train_model(selected_model, cfg)
+            except Exception as exc:
+                print(f"  Training failed: {exc}")
+                if not _ask_yes_no_preflight("Try a different model?", default_yes=True):
+                    print()
+                    return PreflightResult(mode="baseline")
+                continue
+
+            if cfg.data.get("source") == "supabase_storage":
+                # After the first successful training attempt, never force refresh again in this run.
+                force_refresh_used = True
+                cfg.data["storage_force_refresh"] = False
+
+            _print_ml_report(selected_model, result)
+
+            if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
+                if cfg.persistence.get("save_on_deploy", True):
+                    paths = persist_training_result(result, cfg, run_id="miner")
+                    _sub(f"Saved artifacts: {paths['artifact_dir']}")
+                _section("Ready")
+                _sub(f"Deployed advanced model: {selected_model}")
+                print()
+                return PreflightResult(
+                    mode=f"advanced:{selected_model}",
+                    training_result=result,
+                    model_config=cfg,
+                )
+
+            next_step = _ask_after_deploy_decline()
+            if next_step == "baseline":
+                _section("Ready")
+                _sub("Using baseline moving-average model.")
+                print()
+                return PreflightResult(mode="baseline")
+            if next_step == "exit":
+                raise PreflightExitRequested()
+            # retrain: loop again with new model choice
+            _section("Train another model")
+            _sub("")
+    except PreflightExitRequested:
+        _section("Exit")
+        _sub("Exiting miner before startup.")
+        print()
+        return PreflightResult(mode="exit")
 
 
 class Miner(BaseMinerNeuron):
@@ -406,6 +428,8 @@ if __name__ == "__main__":
         model_params_path=preflight_args.model_params_path,
         non_interactive=preflight_args.non_interactive,
     )
+    if preflight_result.mode == "exit":
+        raise SystemExit(0)
 
     with Miner(preflight_result=preflight_result) as miner:
         while True:
