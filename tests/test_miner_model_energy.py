@@ -27,6 +27,7 @@ from miner_model_energy.pipeline import (
     train_model,
 )
 from miner_model_energy.supabase_io import fetch_supabase_test_row, fetch_supabase_train_all
+from miner_model_energy.storage_train_io import load_train_from_storage_parts, storage_cache_exists
 
 
 def _weather_row(i: int, start: datetime) -> dict:
@@ -473,6 +474,196 @@ def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):
     assert len(test_frame) == 1
     assert "Total Load" in train_model_frame.columns
     assert "4B8-tmpf" in features
+
+
+def test_storage_cache_miss_downloads_and_writes_cache(tmp_path, monkeypatch):
+    train_path, test_path = _write_dataset(tmp_path)
+
+    part1 = pd.DataFrame(
+        [
+            {
+                "dt": "2026-04-13 20:45:00+00:00",
+                "total_load": 1000,
+                "4B8-tmpf": 55,
+            },
+            {
+                "dt": "2026-04-13 20:50:00+00:00",
+                "total_load": 1001,
+                "4B8-tmpf": 56,
+            },
+        ]
+    )
+    part2 = pd.DataFrame(
+        [
+            {
+                "dt": "2026-04-13 20:55:00+00:00",
+                "total_load": 1002,
+                "4B8-tmpf": 57,
+            }
+        ]
+    )
+
+    base_url = "https://example.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/"
+    part_map = {
+        base_url + "part-2024-01.csv": part1.to_csv(index=False),
+        base_url + "part-2024-02.csv": part2.to_csv(index=False),
+    }
+
+    class _FakeResp:
+        def __init__(self, content: str):
+            self.content = content.encode("utf-8")
+
+        def raise_for_status(self):
+            return None
+
+    def _fake_get(url, timeout=0):
+        if url not in part_map:
+            raise AssertionError(f"Unexpected download URL: {url}")
+        return _FakeResp(part_map[url])
+
+    monkeypatch.setattr("miner_model_energy.storage_train_io.requests.get", _fake_get)
+
+    cache_dir = tmp_path / "cache"
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=train_path,
+        test_path=test_path,
+        feature_patch={"use_time_features": False, "use_station_agg_features": False},
+        data_patch={
+            "source": "supabase_storage",
+            "storage_train_base_url": base_url,
+            "storage_train_parts": ["part-2024-01.csv", "part-2024-02.csv"],
+            "storage_cache_dir": str(cache_dir),
+            "storage_cache_parquet_name": "train_merged.parquet",
+            # API keys (not used by this test; storage loader is public-download only)
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+
+    assert storage_cache_exists(cfg) is False
+    df = load_train_from_storage_parts(cfg, force_refresh=False)
+    assert len(df) == 3
+    assert storage_cache_exists(cfg) is True
+
+
+def test_storage_cache_hit_avoids_download(tmp_path, monkeypatch):
+    train_path, test_path = _write_dataset(tmp_path)
+
+    part_df = pd.DataFrame(
+        [
+            {"dt": "2026-04-13 20:45:00+00:00", "total_load": 1000, "4B8-tmpf": 55},
+            {"dt": "2026-04-13 20:50:00+00:00", "total_load": 1001, "4B8-tmpf": 56},
+        ]
+    )
+    base_url = "https://example.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/"
+    part_map = {base_url + "part-2024-01.csv": part_df.to_csv(index=False)}
+
+    class _FakeResp:
+        def __init__(self, content: str):
+            self.content = content.encode("utf-8")
+
+        def raise_for_status(self):
+            return None
+
+    def _fake_get(url, timeout=0):
+        return _FakeResp(part_map[url])
+
+    monkeypatch.setattr("miner_model_energy.storage_train_io.requests.get", _fake_get)
+
+    cache_dir = tmp_path / "cache"
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=train_path,
+        test_path=test_path,
+        data_patch={
+            "source": "supabase_storage",
+            "storage_train_base_url": base_url,
+            "storage_train_parts": ["part-2024-01.csv"],
+            "storage_cache_dir": str(cache_dir),
+            "storage_cache_parquet_name": "train_merged.parquet",
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+
+    # First load -> download.
+    df1 = load_train_from_storage_parts(cfg, force_refresh=False)
+    assert len(df1) == 2
+    assert storage_cache_exists(cfg) is True
+
+    # Second load -> must not download again.
+    def _fake_get_should_not_be_called(_url, timeout=0):
+        raise AssertionError("Storage download should not be called on cache hit.")
+
+    monkeypatch.setattr("miner_model_energy.storage_train_io.requests.get", _fake_get_should_not_be_called)
+    df2 = load_train_from_storage_parts(cfg, force_refresh=False)
+    assert df2.shape == df1.shape
+
+
+def test_storage_cache_rebuild_failure_falls_back_to_existing_cache(tmp_path, monkeypatch):
+    train_path, test_path = _write_dataset(tmp_path)
+
+    part_df = pd.DataFrame(
+        [
+            {"dt": "2026-04-13 20:45:00+00:00", "total_load": 1000, "4B8-tmpf": 55},
+            {"dt": "2026-04-13 20:50:00+00:00", "total_load": 1001, "4B8-tmpf": 56},
+        ]
+    )
+    base_url = "https://example.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/"
+    part_map = {base_url + "part-2024-01.csv": part_df.to_csv(index=False)}
+
+    class _FakeResp:
+        def __init__(self, content: str):
+            self.content = content.encode("utf-8")
+
+        def raise_for_status(self):
+            return None
+
+    def _fake_get(url, timeout=0):
+        return _FakeResp(part_map[url])
+
+    monkeypatch.setattr("miner_model_energy.storage_train_io.requests.get", _fake_get)
+
+    cache_dir = tmp_path / "cache"
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=train_path,
+        test_path=test_path,
+        data_patch={
+            "source": "supabase_storage",
+            "storage_train_base_url": base_url,
+            "storage_train_parts": ["part-2024-01.csv"],
+            "storage_cache_dir": str(cache_dir),
+            "storage_cache_parquet_name": "train_merged.parquet",
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+
+    df1 = load_train_from_storage_parts(cfg, force_refresh=False)
+    assert len(df1) == 2
+    assert storage_cache_exists(cfg) is True
+
+    def _fake_get_fails(_url, timeout=0):
+        raise RuntimeError("network fail during rebuild")
+
+    monkeypatch.setattr("miner_model_energy.storage_train_io.requests.get", _fake_get_fails)
+    # Force refresh rebuild -> should fall back to cached df1 without raising.
+    df2 = load_train_from_storage_parts(cfg, force_refresh=True)
+    assert df2.shape == df1.shape
 
 
 if __name__ == "__main__":

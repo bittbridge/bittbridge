@@ -75,6 +75,28 @@ def _as_int_list(value: Any, key: str, default: List[int]) -> List[int]:
     return out
 
 
+def _as_str_list(value: Any, key: str) -> List[str]:
+    if value is None:
+        raise ValueError(f"`{key}` is required.")
+    if isinstance(value, str):
+        # Allow comma-separated values as a convenience.
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        if not parts:
+            raise ValueError(f"`{key}` must contain at least one filename.")
+        return parts
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"`{key}` must be a non-empty list of strings.")
+    out: List[str] = []
+    for item in value:
+        s = str(item).strip()
+        if not s:
+            continue
+        out.append(s)
+    if not out:
+        raise ValueError(f"`{key}` must contain at least one non-empty filename string.")
+    return out
+
+
 def _normalize_keras_sequence_model(models: Dict[str, Any], yaml_key: str) -> None:
     """Shared defaults for LSTM and vanilla RNN (SimpleRNN) blocks in YAML."""
     cfg = models.setdefault(yaml_key, {})
@@ -113,8 +135,8 @@ def load_model_config(path: str) -> ModelConfig:
     persistence = raw.get("persistence", {})
 
     source = str(data.get("source", "csv")).strip().lower()
-    if source not in {"csv", "supabase"}:
-        raise ValueError("`data.source` must be one of: csv, supabase.")
+    if source not in {"csv", "supabase", "supabase_storage"}:
+        raise ValueError("`data.source` must be one of: csv, supabase, supabase_storage.")
     data["source"] = source
 
     train_csv = _clean_optional_str(data.get("train_csv"))
@@ -142,12 +164,31 @@ def load_model_config(path: str) -> ModelConfig:
         for key in required_supabase_keys:
             value = _clean_optional_str(data.get(key))
             if not value:
-                raise ValueError(f"`data.{key}` is required when `data.source: supabase`.")
+                raise ValueError(f"`data.{key}` is required when `data.source: supabase/supabase_storage`.")
             data[key] = value
         data["forecast_horizon_min"] = int(data.get("forecast_horizon_min", 5))
         data["supabase_page_size"] = int(data.get("supabase_page_size", 1000))
         if data["supabase_page_size"] <= 0:
             raise ValueError("`data.supabase_page_size` must be > 0.")
+
+        if source == "supabase_storage":
+            data["storage_train_base_url"] = _clean_optional_str(data.get("storage_train_base_url"))
+            if not data["storage_train_base_url"]:
+                raise ValueError("`data.storage_train_base_url` is required when `data.source: supabase_storage`.")
+
+            data["storage_train_parts"] = _as_str_list(
+                data.get("storage_train_parts"), "data.storage_train_parts"
+            )
+
+            data["storage_cache_dir"] = _clean_optional_str(data.get("storage_cache_dir"))
+            if not data["storage_cache_dir"]:
+                raise ValueError("`data.storage_cache_dir` is required when `data.source: supabase_storage`.")
+
+            data["storage_cache_parquet_name"] = _clean_optional_str(
+                data.get("storage_cache_parquet_name")
+            ) or "train_merged.parquet"
+
+            data["storage_force_refresh"] = bool(data.get("storage_force_refresh", False))
 
     validation_split = float(training.get("validation_split", 0.2))
     if validation_split <= 0.0 or validation_split >= 0.5:

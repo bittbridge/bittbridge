@@ -19,6 +19,7 @@ from miner_model_energy.inference_runtime import (
 )
 from miner_model_energy.ml_config import load_model_config
 from miner_model_energy.pipeline import persist_training_result, train_model
+from miner_model_energy.storage_train_io import storage_cache_exists
 
 # ---------------------------
 # Miner Forward Logic for New England Energy Demand (LoadMw) Prediction
@@ -191,6 +192,9 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
     except Exception as exc:
         print(f"  Failed to load model config: {exc}")
         return PreflightResult(mode="baseline")
+
+    storage_force_refresh_decision = False
+    force_refresh_used = False
     if cfg.data.get("source") == "supabase":
         _sub(
             "Data source: SUPABASE "
@@ -198,10 +202,23 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
             f"train_table={cfg.data['supabase_train_table']}, "
             f"test_table={cfg.data['supabase_test_table']})"
         )
+    elif cfg.data.get("source") == "supabase_storage":
+        cache_ok = storage_cache_exists(cfg)
+        if cache_ok:
+            storage_force_refresh_decision = _ask_yes_no_preflight(
+                "Update training data now?", default_yes=False
+            )
+        else:
+            _section("Supabase Storage training cache")
+            _sub("First-time training data fetch (~2-3m).")
+            storage_force_refresh_decision = False
 
     while True:
         selected_model = _ask_model_type_preflight()
         try:
+            if cfg.data.get("source") == "supabase_storage":
+                # Only rebuild the cache once per miner run; subsequent models reuse the merged snapshot.
+                cfg.data["storage_force_refresh"] = storage_force_refresh_decision and not force_refresh_used
             result = train_model(selected_model, cfg)
         except Exception as exc:
             print(f"  Training failed: {exc}")
@@ -209,6 +226,11 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
                 print()
                 return PreflightResult(mode="baseline")
             continue
+
+        if cfg.data.get("source") == "supabase_storage":
+            # After the first successful training attempt, never force refresh again in this run.
+            force_refresh_used = True
+            cfg.data["storage_force_refresh"] = False
 
         _print_ml_report(selected_model, result)
 
@@ -270,7 +292,10 @@ class Miner(BaseMinerNeuron):
         self.predictor_router = PredictorRouter(BaselineMovingAveragePredictor(N_STEPS))
         if preflight_result and preflight_result.training_result is not None:
             predictor = AdvancedModelPredictor(result=preflight_result.training_result)
-            if preflight_result.model_config and preflight_result.model_config.data.get("source") == "supabase":
+            if preflight_result.model_config and preflight_result.model_config.data.get("source") in {
+                "supabase",
+                "supabase_storage",
+            }:
                 predictor = SupabaseLiveAdvancedPredictor(
                     result=preflight_result.training_result,
                     config=preflight_result.model_config,

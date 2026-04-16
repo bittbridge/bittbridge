@@ -38,6 +38,7 @@ from .supabase_io import (
     fetch_supabase_train_tail,
     normalize_supabase_test_frame,
 )
+from .storage_train_io import load_train_from_storage_parts
 
 
 @dataclass
@@ -109,6 +110,22 @@ def _load_train_test_by_source(config: ModelConfig) -> Tuple[pd.DataFrame, pd.Da
     source = config.data.get("source", "csv")
     if source == "supabase":
         return _load_supabase_train_test(config)
+    if source == "supabase_storage":
+        data_cfg = config.data
+        force_refresh = bool(data_cfg.get("storage_force_refresh", False))
+        train = load_train_from_storage_parts(config=config, force_refresh=force_refresh)
+
+        test_csv = data_cfg.get("test_csv")
+        if test_csv:
+            test = pd.read_csv(test_csv)
+            test[TIMESTAMP_COLUMN] = pd.to_datetime(test[TIMESTAMP_COLUMN], errors="raise")
+            test = test.sort_values(TIMESTAMP_COLUMN).reset_index(drop=True)
+            return train, test
+
+        if len(train) < 2:
+            raise ValueError("Supabase Storage train data needs at least 2 rows for a fallback test row.")
+        test = train.tail(1).drop(columns=[TARGET_COLUMN], errors="ignore").copy()
+        return train, test
     return load_train_test(config.data["train_csv"], config.data["test_csv"])
 
 
@@ -117,16 +134,16 @@ def prepare_training_data(
     show_progress: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
     source = config.data.get("source", "csv")
-    if source == "supabase" and show_progress:
+    if source in {"supabase", "supabase_storage"} and show_progress:
         print(
-            "  [train]     Data source: SUPABASE "
-            f"(schema={config.data['supabase_schema']}, "
-            f"train_table={config.data['supabase_train_table']}, "
-            f"test_table={config.data['supabase_test_table']})",
+            f"  [train]     Data source: {source.upper()} "
+            f"(schema={config.data.get('supabase_schema')}, "
+            f"train_table={config.data.get('supabase_train_table')}, "
+            f"test_table={config.data.get('supabase_test_table')})",
             flush=True,
         )
     train, test = _load_train_test_by_source(config)
-    if source == "supabase" and show_progress:
+    if source in {"supabase", "supabase_storage"} and show_progress:
         print(
             f"  [train]     Supabase data pulled: train_shape={train.shape}, test_shape={test.shape}",
             flush=True,
@@ -393,7 +410,7 @@ def _build_live_sequence_matrix(
 
 def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp_str: str) -> float:
     source = config.data.get("source", "csv")
-    if source != "supabase":
+    if source not in {"supabase", "supabase_storage"}:
         return predict_single_test_row(result)
 
     data_cfg = config.data

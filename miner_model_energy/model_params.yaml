@@ -103,3 +103,9 @@ data:
   supabase_test_table: hackathon-test-data
   forecast_horizon_min: 5
   supabase_page_size: 1000
+  # Optional training cache based on your public Supabase Storage CSV dumps.
+  # Set `data.source: supabase_storage` to enable.
+  storage_train_base_url: https://lparhzmnwbslsskxswfr.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/
+  storage_train_parts: [part-2026-04.csv]
+  storage_cache_dir: miner_model_energy/cache
+  storage_cache_parquet_name: train_merged.parquet
