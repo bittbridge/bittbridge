@@ -1,7 +1,10 @@
 import argparse
 import random
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 import typing
 import bittensor as bt
@@ -126,6 +129,17 @@ def _print_ml_report(selected_model: str, result) -> None:
         f"MAPE: {va['mape']:.3f}%    "
         f"R²: {va['r2']:.5f}"
     )
+    preview = getattr(result, "diagnostics_preview_path", None)
+    if preview:
+        _sub("")
+        _sub("Performance plot")
+        _sub("-" * (_SECTION_WIDTH - 4))
+        _sub(f"  {preview}")
+        if sys.platform == "darwin":
+            try:
+                subprocess.run(["open", preview], check=False, timeout=30)
+            except (OSError, subprocess.SubprocessError):
+                pass
     print()
 
 
@@ -257,8 +271,15 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
 
             if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
                 if cfg.persistence.get("save_on_deploy", True):
-                    paths = persist_training_result(result, cfg, run_id="miner")
+                    paths = persist_training_result(
+                        result,
+                        cfg,
+                        run_id="miner",
+                        export_predictions_csv_dir=Path(model_params_path).resolve().parent,
+                    )
                     _sub(f"Saved artifacts: {paths['artifact_dir']}")
+                    if paths.get("predictions_csv_path"):
+                        _sub(f"Saved actual vs predicted CSV: {paths['predictions_csv_path']}")
                 _section("Ready")
                 _sub(f"Deployed advanced model: {selected_model}")
                 print()
