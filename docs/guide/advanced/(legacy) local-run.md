@@ -22,7 +22,7 @@ Run the miner (and optionally a validator) on your own machine instead of GCP.
 5. [3. Wallets and Tokens](../03-wallets-and-tokens.md)
 6. [4. Run Miner](../04-run-miner.md)
 7. (Optional) [Run validator](run-validator.md)
-8. [Update and restart](../update-and-restart.md) when code changes
+8. [Update and restart](../05-update-and-restart.md) when code changes
 
 Port forwarding: [Troubleshooting](troubleshooting.md).
 

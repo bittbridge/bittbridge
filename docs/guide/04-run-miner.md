@@ -90,7 +90,14 @@ When you SSH back into the VM:
 tmux attach -t miner
 ```
 
-When the repo is updated, use **[Update and restart](update-and-restart.md)**.
+---
+
+## Next steps
+
+After the baseline miner is running:
+
+1. **[5. Update and restart](05-update-and-restart.md)** — Pull the latest code, run `pip install -r requirements.txt`, and restart when the repo changes.
+2. **[6. Advanced miner models](06-advanced-miner-models.md)** — Tune `features` and `models` in `model_params.yaml`, then run the same miner command and explore ML beyond the moving average.
 
 ---
 
@@ -117,4 +124,4 @@ When the repo is updated, use **[Update and restart](update-and-restart.md)**.
 
 ---
 
-[← 3. Wallets and tokens](03-wallets-and-tokens.md) · [Update and restart](update-and-restart.md) · [Guide](../../README.md#guide)
+[← 3. Wallets and tokens](03-wallets-and-tokens.md) · [5. Update and restart](05-update-and-restart.md) · [6. Advanced miner models](06-advanced-miner-models.md) · [Guide](../../README.md#guide)

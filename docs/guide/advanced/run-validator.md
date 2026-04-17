@@ -44,4 +44,4 @@ Detach: **`Ctrl+b`** then **`d`**. Reattach: `tmux attach -t validator`
 
 ---
 
-[Update and restart](../update-and-restart.md) (validator section) · [Advanced index](README.md) · [Guide](../../../README.md#guide)
+[Update and restart](../05-update-and-restart.md) (validator section) · [Advanced index](README.md) · [Guide](../../../README.md#guide)
