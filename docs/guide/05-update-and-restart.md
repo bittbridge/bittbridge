@@ -66,6 +66,13 @@ git reset --hard
 git pull
 ```
 
+Run it one more time just in case!
+```bash
+cd ~/bittbridge
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
 ---
 
 | Step | Action |
