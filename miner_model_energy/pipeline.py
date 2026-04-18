@@ -52,9 +52,7 @@ class TrainingResult:
     shapes: Dict[str, Tuple[int, ...]]
     durations_sec: Dict[str, float] = field(default_factory=dict)
     predictions_frame: Optional[pd.DataFrame] = None
-    # Full-resolution PNG for scp / image viewers; terminal-tuned PNG for viu (see pipeline).
     diagnostics_preview_path: Optional[str] = None
-    diagnostics_terminal_plot_path: Optional[str] = None
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -143,7 +141,6 @@ def write_actual_vs_predicted_plot(
     model_type: str,
     max_points_per_split: int = 10_000,
 ) -> None:
-    """Full-resolution side-by-side plot for desktop viewers and SCP."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -151,7 +148,7 @@ def write_actual_vs_predicted_plot(
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=False, sharey=False)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharex=False, sharey=False)
     for ax, split_name, title in (
         (axes[0], "train", "Train"),
         (axes[1], "validation", "Validation"),
@@ -164,79 +161,21 @@ def write_actual_vs_predicted_plot(
         plot_sub = sub
         if len(plot_sub) > max_points_per_split:
             plot_sub = plot_sub.sample(n=max_points_per_split, random_state=42)
-        ax.scatter(plot_sub["actual"], plot_sub["predicted"], s=6, alpha=0.35)
+        ax.scatter(plot_sub["actual"], plot_sub["predicted"], s=4, alpha=0.35)
         lo = float(min(plot_sub["actual"].min(), plot_sub["predicted"].min()))
         hi = float(max(plot_sub["actual"].max(), plot_sub["predicted"].max()))
         if lo == hi:
             lo -= 1.0
             hi += 1.0
-        ax.plot([lo, hi], [lo, hi], "k--", lw=1.2)
+        ax.plot([lo, hi], [lo, hi], "k--", lw=1.0)
         ax.set_xlabel("Actual")
         ax.set_ylabel("Predicted")
         ax.set_title(f"{title} (n={len(sub)})")
         ax.set_aspect("equal", adjustable="box")
-    fig.suptitle(f"Actual vs predicted — {model_type}", fontsize=13)
+    fig.suptitle(f"Actual vs predicted — {model_type}")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=160, bbox_inches="tight")
+    fig.savefig(out_path, dpi=120, bbox_inches="tight")
     plt.close(fig)
-
-
-def write_actual_vs_predicted_plot_terminal(
-    frame: pd.DataFrame,
-    out_path: Path,
-    model_type: str,
-    max_points_per_split: int = 10_000,
-) -> None:
-    """
-    PNG tuned for terminal rasterizers (viu, etc.): tall stacked panels, very large
-    type, high pixel count so downscaling to the terminal grid keeps text readable.
-    """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.ticker import MaxNLocator
-
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    rc = {
-        "font.size": 16,
-        "axes.labelsize": 20,
-        "axes.titlesize": 22,
-        "xtick.labelsize": 16,
-        "ytick.labelsize": 16,
-    }
-    with plt.rc_context(rc):
-        fig, axes = plt.subplots(2, 1, figsize=(12, 14), sharex=False, sharey=False)
-        for ax, split_name, title in (
-            (axes[0], "train", "Train"),
-            (axes[1], "validation", "Validation"),
-        ):
-            sub = frame[frame["split"] == split_name]
-            if len(sub) == 0:
-                ax.set_title(f"{title} (no rows)", fontsize=22)
-                ax.text(0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes, fontsize=20)
-                continue
-            plot_sub = sub
-            if len(plot_sub) > max_points_per_split:
-                plot_sub = plot_sub.sample(n=max_points_per_split, random_state=42)
-            ax.scatter(plot_sub["actual"], plot_sub["predicted"], s=22, alpha=0.35)
-            lo = float(min(plot_sub["actual"].min(), plot_sub["predicted"].min()))
-            hi = float(max(plot_sub["actual"].max(), plot_sub["predicted"].max()))
-            if lo == hi:
-                lo -= 1.0
-                hi += 1.0
-            ax.plot([lo, hi], [lo, hi], "k--", lw=2.0)
-            ax.set_xlabel("Actual")
-            ax.set_ylabel("Predicted")
-            ax.set_title(f"{title} (n={len(sub):,})", fontsize=22)
-            ax.set_aspect("equal", adjustable="box")
-            ax.xaxis.set_major_locator(MaxNLocator(6))
-            ax.yaxis.set_major_locator(MaxNLocator(6))
-        fig.suptitle(f"Actual vs predicted — {model_type}", fontsize=24, y=1.01)
-        fig.tight_layout()
-        fig.savefig(out_path, dpi=240, bbox_inches="tight")
-        plt.close(fig)
 
 
 def _load_supabase_train_test(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -493,19 +432,12 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
 
     preview_dir = Path(config.persistence["artifact_dir"]) / "training_preview"
     preview_path = preview_dir / "actual_vs_predicted.png"
-    terminal_preview_path = preview_dir / "actual_vs_predicted_terminal.png"
     diagnostics_preview_path: Optional[str] = None
-    diagnostics_terminal_plot_path: Optional[str] = None
     try:
         write_actual_vs_predicted_plot(predictions_frame, preview_path, model_type)
         diagnostics_preview_path = str(preview_path.resolve())
     except Exception as exc:
-        warnings.warn(f"Could not write high-resolution prediction plot: {exc}", UserWarning, stacklevel=2)
-    try:
-        write_actual_vs_predicted_plot_terminal(predictions_frame, terminal_preview_path, model_type)
-        diagnostics_terminal_plot_path = str(terminal_preview_path.resolve())
-    except Exception as exc:
-        warnings.warn(f"Could not write terminal-tuned prediction plot: {exc}", UserWarning, stacklevel=2)
+        warnings.warn(f"Could not write prediction diagnostics plot: {exc}", UserWarning, stacklevel=2)
 
     return TrainingResult(
         model_type=model_type,
@@ -524,7 +456,6 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         durations_sec=durations_sec,
         predictions_frame=predictions_frame,
         diagnostics_preview_path=diagnostics_preview_path,
-        diagnostics_terminal_plot_path=diagnostics_terminal_plot_path,
     )
 
 

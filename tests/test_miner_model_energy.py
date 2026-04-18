@@ -209,10 +209,6 @@ def test_train_model_writes_preview_plot_and_predictions_frame(tmp_path):
     png = Path(result.diagnostics_preview_path)
     assert png.is_file()
     assert png.name == "actual_vs_predicted.png"
-    assert result.diagnostics_terminal_plot_path
-    term = Path(result.diagnostics_terminal_plot_path)
-    assert term.is_file()
-    assert term.name == "actual_vs_predicted_terminal.png"
 
 
 def test_persist_exports_predictions_csv_when_dir_passed(tmp_path):
