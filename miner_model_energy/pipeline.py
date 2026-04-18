@@ -5,7 +5,6 @@ import json
 import time
 import warnings
 from pathlib import Path
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -112,7 +111,7 @@ def print_actual_vs_predicted_plotext(result: TrainingResult, model_label: str) 
     except ImportError:
         print("  Warning: plotext is not installed; skipping actual vs predicted plots.")
         return
-    max_points = 1200
+    max_points = 50000
     try:
         for y_true, y_pred, title_suffix in (
             (result.y_train, result.train_pred, "training"),
@@ -125,7 +124,17 @@ def print_actual_vs_predicted_plotext(result: TrainingResult, model_label: str) 
             xa = y_true[idx].astype(float)
             yb = y_pred[idx].astype(float)
             plt.clear_data()
-            plt.scatter(xa, yb)
+            lo = float(np.nanmin(np.concatenate([xa, yb])))
+            hi = float(np.nanmax(np.concatenate([xa, yb])))
+            if not np.isfinite(lo) or not np.isfinite(hi):
+                continue
+            if hi - lo < 1e-12:
+                pad = 1.0 if lo == 0.0 else abs(lo) * 0.01
+                lo -= pad
+                hi += pad
+            # Identity line y = x (perfect prediction); draw first so points sit on top.
+            plt.plot([lo, hi], [lo, hi], label="y = x (perfect)")
+            plt.scatter(xa, yb, label="model")
             plt.xlabel("actual")
             plt.ylabel("predicted")
             plt.title(f"{model_label} — Actual vs predicted ({title_suffix})")
@@ -597,14 +606,6 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
     avp_df = build_actual_vs_predicted_dataframe(result)
     avp_path = out_dir / ACTUAL_VS_PREDICTED_CSV
     avp_df.to_csv(avp_path, index=False)
-
-    cfg_file = config.persistence.get("config_file")
-    if cfg_file:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        rid = run_id or "run"
-        unique_name = f"actual_vs_predicted_{stamp}_{result.model_type}_{rid}.csv"
-        yaml_dir = Path(cfg_file).resolve().parent
-        avp_df.to_csv(yaml_dir / unique_name, index=False)
 
     cfg_snapshot = {
         "data": config.data,

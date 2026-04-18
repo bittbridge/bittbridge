@@ -199,8 +199,6 @@ def test_linear_training_and_persistence(tmp_path):
     avp = Path(saved["artifact_dir"]) / "actual_vs_predicted.csv"
     assert avp.is_file()
     assert len(pd.read_csv(avp)) > 0
-    yaml_side = list(cfg_path.parent.glob("actual_vs_predicted_*_linear_pytest.csv"))
-    assert len(yaml_side) == 1
 
 
 def test_relative_artifact_dir_resolves_next_to_config_file(tmp_path):
