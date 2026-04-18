@@ -82,8 +82,10 @@ models:
     standardize_inputs: false
     fit_verbose: 1
 
+# Artifacts are written under this directory next to model_params.yaml (relative paths resolve to the YAML folder).
+# Training saves a timestamped run on every successful train; save_on_deploy is legacy (no longer gates saving).
 persistence:
-  artifact_dir: miner_model_energy/artifacts
+  artifact_dir: artifacts
   save_on_deploy: true
 
 # ------------------------------------------------------------

@@ -50,6 +50,10 @@ class TrainingResult:
     train_frame: pd.DataFrame
     test_frame: pd.DataFrame
     shapes: Dict[str, Tuple[int, ...]]
+    y_train: np.ndarray = field(default_factory=lambda: np.array([]))
+    train_pred: np.ndarray = field(default_factory=lambda: np.array([]))
+    y_val: np.ndarray = field(default_factory=lambda: np.array([]))
+    val_pred: np.ndarray = field(default_factory=lambda: np.array([]))
     durations_sec: Dict[str, float] = field(default_factory=dict)
 
 
@@ -73,6 +77,70 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     mape = float(np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1e-6, None))) * 100.0)
     r2 = float(r2_score(y_true, y_pred))
     return {"rmse": rmse, "mae": mae, "mape": mape, "r2": r2}
+
+
+ACTUAL_VS_PREDICTED_CSV = "actual_vs_predicted.csv"
+
+
+def _subsample_indices(n: int, max_points: int) -> np.ndarray:
+    if n <= max_points:
+        return np.arange(n, dtype=np.int64)
+    rng = np.random.default_rng(42)
+    return np.sort(rng.choice(n, size=max_points, replace=False))
+
+
+def build_actual_vs_predicted_dataframe(result: TrainingResult) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+    for split, y_true, y_pred in (
+        ("train", result.y_train, result.train_pred),
+        ("validation", result.y_val, result.val_pred),
+    ):
+        if y_true.size == 0 or y_pred.size == 0:
+            continue
+        n = min(len(y_true), len(y_pred))
+        for i in range(n):
+            a = float(y_true[i])
+            p = float(y_pred[i])
+            rows.append({"split": split, "actual": a, "predicted": p, "error": p - a})
+    return pd.DataFrame(rows)
+
+
+def print_actual_vs_predicted_plotext(result: TrainingResult, model_label: str) -> None:
+    try:
+        import plotext as plt
+    except ImportError:
+        print("  Warning: plotext is not installed; skipping actual vs predicted plots.")
+        return
+    max_points = 50000
+    try:
+        for y_true, y_pred, title_suffix in (
+            (result.y_train, result.train_pred, "training"),
+            (result.y_val, result.val_pred, "validation"),
+        ):
+            if y_true.size == 0 or y_pred.size == 0:
+                continue
+            n = min(len(y_true), len(y_pred))
+            idx = _subsample_indices(n, max_points)
+            xa = y_true[idx].astype(float)
+            yb = y_pred[idx].astype(float)
+            plt.clear_data()
+            lo = float(np.nanmin(np.concatenate([xa, yb])))
+            hi = float(np.nanmax(np.concatenate([xa, yb])))
+            if not np.isfinite(lo) or not np.isfinite(hi):
+                continue
+            if hi - lo < 1e-12:
+                pad = 1.0 if lo == 0.0 else abs(lo) * 0.01
+                lo -= pad
+                hi += pad
+            # Identity line y = x (perfect prediction); draw first so points sit on top.
+            plt.plot([lo, hi], [lo, hi], label="y = x (perfect)")
+            plt.scatter(xa, yb, label="model")
+            plt.xlabel("actual")
+            plt.ylabel("predicted")
+            plt.title(f"{model_label} — Actual vs predicted ({title_suffix})")
+            plt.show()
+    except Exception as exc:
+        print(f"  Warning: could not render plotext charts ({exc}).")
 
 
 def _load_supabase_train_test(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -326,6 +394,10 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
             "y_train": tuple(y_train.shape),
             "y_val": tuple(y_val.shape),
         },
+        y_train=y_train,
+        train_pred=train_pred,
+        y_val=y_val,
+        val_pred=val_pred,
         durations_sec=durations_sec,
     )
 
@@ -531,12 +603,16 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
     metrics_path = out_dir / "metrics.json"
     metrics_path.write_text(pd.Series(result.metrics).to_json(indent=2), encoding="utf-8")
 
+    avp_df = build_actual_vs_predicted_dataframe(result)
+    avp_path = out_dir / ACTUAL_VS_PREDICTED_CSV
+    avp_df.to_csv(avp_path, index=False)
+
     cfg_snapshot = {
         "data": config.data,
         "features": config.features,
         "training": config.training,
         "models": config.models,
-        "persistence": config.persistence,
+        "persistence": {k: v for k, v in config.persistence.items() if k != "config_file"},
     }
     write_config_snapshot(out_dir, cfg_snapshot)
 
@@ -544,6 +620,7 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "model_type": result.model_type,
         "model_path": model_rel,
         "metrics_path": metrics_path.name,
+        "actual_vs_predicted_path": ACTUAL_VS_PREDICTED_CSV,
         "features": result.features,
         "features_count": len(result.features),
         "feature_signature": feature_signature(result.features),

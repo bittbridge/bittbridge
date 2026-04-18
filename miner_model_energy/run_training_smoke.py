@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 
 from miner_model_energy.ml_config import load_model_config
-from miner_model_energy.pipeline import predict_single_test_row, train_model
+from miner_model_energy.pipeline import predict_single_test_row, print_actual_vs_predicted_plotext, train_model
 
 
 def main():
@@ -25,6 +25,8 @@ def main():
 
     cfg = load_model_config(args.config)
     result = train_model(args.model, cfg)
+    if cfg.training.get("show_training_progress", True):
+        print_actual_vs_predicted_plotext(result, args.model)
     one_pred = predict_single_test_row(result)
     d = result.durations_sec
     print(
