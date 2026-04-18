@@ -18,7 +18,11 @@ from miner_model_energy.inference_runtime import (
     SupabaseLiveAdvancedPredictor,
 )
 from miner_model_energy.ml_config import load_model_config
-from miner_model_energy.pipeline import persist_training_result, train_model
+from miner_model_energy.pipeline import (
+    persist_training_result,
+    print_actual_vs_predicted_plotext,
+    train_model,
+)
 from miner_model_energy.storage_train_io import (
     storage_cache_exists,
     storage_cache_last_updated_label,
@@ -126,6 +130,7 @@ def _print_ml_report(selected_model: str, result) -> None:
         f"MAPE: {va['mape']:.3f}%    "
         f"R²: {va['r2']:.5f}"
     )
+    print_actual_vs_predicted_plotext(result, selected_model)
     print()
 
 
@@ -255,10 +260,10 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
 
             _print_ml_report(selected_model, result)
 
+            paths = persist_training_result(result, cfg, run_id="miner")
+            _sub(f"Saved artifacts: {paths['artifact_dir']}")
+
             if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
-                if cfg.persistence.get("save_on_deploy", True):
-                    paths = persist_training_result(result, cfg, run_id="miner")
-                    _sub(f"Saved artifacts: {paths['artifact_dir']}")
                 _section("Ready")
                 _sub(f"Deployed advanced model: {selected_model}")
                 print()

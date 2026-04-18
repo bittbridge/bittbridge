@@ -218,8 +218,12 @@ def load_model_config(path: str) -> ModelConfig:
         features.get("include_weather_suffix_groups")
     )
 
-    artifact_dir = persistence.get("artifact_dir", "miner_model_energy/artifacts")
-    persistence["artifact_dir"] = str(Path(artifact_dir))
+    artifact_dir_raw = persistence.get("artifact_dir", "artifacts")
+    artifact_path = Path(artifact_dir_raw)
+    if not artifact_path.is_absolute():
+        artifact_path = (cfg_path.parent / artifact_path).resolve()
+    persistence["artifact_dir"] = str(artifact_path)
+    persistence["config_file"] = str(cfg_path.resolve())
     persistence["save_on_deploy"] = bool(persistence.get("save_on_deploy", True))
 
     return ModelConfig(

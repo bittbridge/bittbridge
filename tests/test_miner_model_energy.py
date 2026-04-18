@@ -186,6 +186,7 @@ def test_linear_training_and_persistence(tmp_path):
         {"use_load_lags": True, "use_load_delta": True},
     )
     cfg = load_model_config(str(cfg_path))
+    assert cfg.persistence.get("config_file") == str(cfg_path.resolve())
     result = train_model("linear", cfg)
     assert result.durations_sec.get("total_sec", 0) >= 0
     pred = AdvancedModelPredictor(result).predict("2025-01-01 12:00:00")
@@ -194,6 +195,51 @@ def test_linear_training_and_persistence(tmp_path):
     saved = persist_training_result(result, cfg, run_id="pytest")
     manifest = load_manifest(saved["manifest_path"])
     assert manifest["model_type"] == "linear"
+    assert manifest.get("actual_vs_predicted_path") == "actual_vs_predicted.csv"
+    avp = Path(saved["artifact_dir"]) / "actual_vs_predicted.csv"
+    assert avp.is_file()
+    assert len(pd.read_csv(avp)) > 0
+    yaml_side = list(cfg_path.parent.glob("actual_vs_predicted_*_linear_pytest.csv"))
+    assert len(yaml_side) == 1
+
+
+def test_relative_artifact_dir_resolves_next_to_config_file(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    nest = tmp_path / "confdir"
+    nest.mkdir(parents=True, exist_ok=True)
+    cfg_path = nest / "params.yaml"
+    features = _default_features()
+    cfg = {
+        "data": {"train_csv": str(train_path), "test_csv": str(test_path)},
+        "features": features,
+        "training": {"validation_split": 0.2, "random_state": 123, "show_training_progress": False},
+        "models": {
+            "linear": {"fit_intercept": True},
+            "cart": {"max_depth": 4, "min_samples_split": 4, "min_samples_leaf": 2},
+            "lstm": {
+                "n_steps": 12,
+                "units": 8,
+                "dropout": 0.1,
+                "epochs": 1,
+                "batch_size": 16,
+                "fit_verbose": 0,
+            },
+            "rnn": {
+                "n_steps": 12,
+                "units": 8,
+                "dropout": 0.1,
+                "epochs": 1,
+                "batch_size": 16,
+                "use_early_stopping": False,
+                "fit_verbose": 0,
+            },
+        },
+        "persistence": {"artifact_dir": "artifacts", "save_on_deploy": True},
+    }
+    cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    loaded = load_model_config(str(cfg_path))
+    assert loaded.persistence["config_file"] == str(cfg_path.resolve())
+    assert loaded.persistence["artifact_dir"] == str((nest / "artifacts").resolve())
 
 
 def test_cart_training(tmp_path):
@@ -312,7 +358,9 @@ def test_lstm_standardize_inputs_and_reload(tmp_path):
     saved = persist_training_result(result, cfg, run_id="pytest_lstm_std")
     scaler_fp = Path(saved["artifact_dir"]) / LSTM_SCALER_FILENAME
     assert scaler_fp.is_file()
+    assert (Path(saved["artifact_dir"]) / "actual_vs_predicted.csv").is_file()
     manifest = load_manifest(saved["manifest_path"])
+    assert manifest.get("actual_vs_predicted_path") == "actual_vs_predicted.csv"
     assert manifest.get("lstm_standardize_inputs") is True
     assert manifest.get("lstm_scaler_path") == LSTM_SCALER_FILENAME
 
