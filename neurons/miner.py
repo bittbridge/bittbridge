@@ -78,26 +78,33 @@ def _format_seconds(sec: float) -> str:
     return f"{int(h)}h {int(m2)}m {s:.0f}s"
 
 
-def _try_show_performance_plot(preview: str) -> None:
+def _try_show_performance_plot(terminal_plot: Optional[str], hires_plot: Optional[str]) -> None:
     """
-    Best-effort display of the PNG on Linux: in-terminal via `viu` if installed (works over SSH),
-    else `xdg-open` when a desktop session is available.
+    Linux only: show terminal-tuned PNG with `viu` using the full terminal grid (-w/-h),
+    else open the high-resolution PNG with `xdg-open` when a desktop is available.
     """
-    if not preview:
-        return
-    path = Path(preview)
-    if not path.is_file():
-        return
     if not sys.platform.startswith("linux"):
         return
-    p = str(path.resolve())
+    viu_target = terminal_plot if terminal_plot and Path(terminal_plot).is_file() else hires_plot
+    if not viu_target or not Path(viu_target).is_file():
+        return
+    viu_path = str(Path(viu_target).resolve())
+    xdg_target = hires_plot if hires_plot and Path(hires_plot).is_file() else terminal_plot
+    xdg_path = str(Path(xdg_target).resolve()) if xdg_target and Path(xdg_target).is_file() else viu_path
+
     try:
         viu = shutil.which("viu")
         if viu and sys.stdout.isatty():
-            subprocess.run([viu, p], check=False, timeout=120)
+            cols, rows = shutil.get_terminal_size(fallback=(120, 40))
+            plot_height = max(18, min(rows - 22, rows - 8))
+            subprocess.run(
+                [viu, "-w", str(cols), "-h", str(plot_height), viu_path],
+                check=False,
+                timeout=120,
+            )
             return
         if shutil.which("xdg-open"):
-            subprocess.run(["xdg-open", p], check=False, timeout=30)
+            subprocess.run(["xdg-open", xdg_path], check=False, timeout=30)
     except (OSError, subprocess.SubprocessError):
         pass
 
@@ -154,17 +161,23 @@ def _print_ml_report(selected_model: str, result) -> None:
         f"MAPE: {va['mape']:.3f}%    "
         f"R²: {va['r2']:.5f}"
     )
-    preview = getattr(result, "diagnostics_preview_path", None)
-    if preview:
+    hires = getattr(result, "diagnostics_preview_path", None)
+    terminal_png = getattr(result, "diagnostics_terminal_plot_path", None)
+    if hires or terminal_png:
         _sub("")
         _sub("Performance plot")
         _sub("-" * (_SECTION_WIDTH - 4))
-        _sub(f"  {preview}")
-        _try_show_performance_plot(preview)
+        if hires:
+            _sub(f"  High resolution (scp / viewer): {hires}")
+        if terminal_png and terminal_png != hires:
+            _sub(f"  Terminal-optimized (viu):        {terminal_png}")
+        elif not hires and terminal_png:
+            _sub(f"  {terminal_png}")
+        _try_show_performance_plot(terminal_png, hires)
         if sys.platform.startswith("linux") and shutil.which("viu") is None and sys.stdout.isatty():
             _sub(
                 "  Tip: install `viu` (https://github.com/atanunq/viu) for an in-terminal image over SSH; "
-                "otherwise `xdg-open` may work if a desktop is available, or copy the path above."
+                "otherwise `xdg-open` may work if a desktop is available, or copy the high-resolution path."
             )
     print()
 
