@@ -1,6 +1,5 @@
 import argparse
 import random
-import shutil
 import subprocess
 import sys
 import time
@@ -78,30 +77,6 @@ def _format_seconds(sec: float) -> str:
     return f"{int(h)}h {int(m2)}m {s:.0f}s"
 
 
-def _try_show_performance_plot(preview: str) -> None:
-    """
-    Best-effort display of the PNG on Linux: in-terminal via `viu` if installed (works over SSH),
-    else `xdg-open` when a desktop session is available.
-    """
-    if not preview:
-        return
-    path = Path(preview)
-    if not path.is_file():
-        return
-    if not sys.platform.startswith("linux"):
-        return
-    p = str(path.resolve())
-    try:
-        viu = shutil.which("viu")
-        if viu and sys.stdout.isatty():
-            subprocess.run([viu, p], check=False, timeout=120)
-            return
-        if shutil.which("xdg-open"):
-            subprocess.run(["xdg-open", p], check=False, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        pass
-
-
 def _print_training_timeline(result) -> None:
     d = getattr(result, "durations_sec", None) or {}
     if not d:
@@ -160,12 +135,11 @@ def _print_ml_report(selected_model: str, result) -> None:
         _sub("Performance plot")
         _sub("-" * (_SECTION_WIDTH - 4))
         _sub(f"  {preview}")
-        _try_show_performance_plot(preview)
-        if sys.platform.startswith("linux") and shutil.which("viu") is None and sys.stdout.isatty():
-            _sub(
-                "  Tip: install `viu` (https://github.com/atanunq/viu) for an in-terminal image over SSH; "
-                "otherwise `xdg-open` may work if a desktop is available, or copy the path above."
-            )
+        if sys.platform == "darwin":
+            try:
+                subprocess.run(["open", preview], check=False, timeout=30)
+            except (OSError, subprocess.SubprocessError):
+                pass
     print()
 
 
