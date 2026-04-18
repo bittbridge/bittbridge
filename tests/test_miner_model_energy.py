@@ -194,40 +194,6 @@ def test_linear_training_and_persistence(tmp_path):
     saved = persist_training_result(result, cfg, run_id="pytest")
     manifest = load_manifest(saved["manifest_path"])
     assert manifest["model_type"] == "linear"
-    assert "predictions_csv_path" not in saved
-
-
-def test_train_model_writes_preview_plot_and_predictions_frame(tmp_path):
-    train_path, test_path = _write_dataset(tmp_path)
-    cfg_path = _write_config(tmp_path, train_path, test_path, {"use_time_features": True})
-    cfg = load_model_config(str(cfg_path))
-    result = train_model("linear", cfg)
-    assert result.predictions_frame is not None
-    assert len(result.predictions_frame) > 0
-    assert set(result.predictions_frame["split"].unique()) == {"train", "validation"}
-    assert result.diagnostics_preview_path
-    png = Path(result.diagnostics_preview_path)
-    assert png.is_file()
-    assert png.name == "actual_vs_predicted.png"
-
-
-def test_persist_exports_predictions_csv_when_dir_passed(tmp_path):
-    train_path, test_path = _write_dataset(tmp_path)
-    cfg_path = _write_config(tmp_path, train_path, test_path, {"use_time_features": True})
-    cfg = load_model_config(str(cfg_path))
-    result = train_model("cart", cfg)
-    csv_dir = tmp_path / "export_csv_here"
-    csv_dir.mkdir(parents=True, exist_ok=True)
-    saved = persist_training_result(
-        result, cfg, run_id="pytest_csv", export_predictions_csv_dir=csv_dir
-    )
-    assert "predictions_csv_path" in saved
-    csv_path = Path(saved["predictions_csv_path"])
-    assert csv_path.is_file()
-    assert csv_path.name == "actual_vs_predicted.csv"
-    reread = pd.read_csv(csv_path)
-    assert list(reread.columns) == ["split", "dt", "actual", "predicted", "residual"]
-    assert len(reread) == len(result.predictions_frame)
 
 
 def test_cart_training(tmp_path):

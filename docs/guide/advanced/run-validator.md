@@ -4,8 +4,6 @@
 
 Run the validator **on the GCP VM** from the repo root with venv activated. Use tmux, then detach.
 
-Need a concrete ground-truth data example? See [Validator actual-demand fetch example](validator-fetch-actual-energy-demand-data.md).
-
 **Before running:**
 
 - Register the validator hotkey on subnet 183 (if needed):

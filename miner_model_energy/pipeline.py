@@ -5,7 +5,7 @@ import json
 import time
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -51,8 +51,6 @@ class TrainingResult:
     test_frame: pd.DataFrame
     shapes: Dict[str, Tuple[int, ...]]
     durations_sec: Dict[str, float] = field(default_factory=dict)
-    predictions_frame: Optional[pd.DataFrame] = None
-    diagnostics_preview_path: Optional[str] = None
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -75,107 +73,6 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     mape = float(np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1e-6, None))) * 100.0)
     r2 = float(r2_score(y_true, y_pred))
     return {"rmse": rmse, "mae": mae, "mape": mape, "r2": r2}
-
-
-def _build_predictions_frame(
-    model_type: str,
-    train_split: pd.DataFrame,
-    val_split: pd.DataFrame,
-    y_train: np.ndarray,
-    train_pred: np.ndarray,
-    y_val: np.ndarray,
-    val_pred: np.ndarray,
-    seq_n_steps: Optional[int],
-) -> pd.DataFrame:
-    def _rows_for_split(
-        split_name: str, split_df: pd.DataFrame, y_true: np.ndarray, y_hat: np.ndarray
-    ) -> List[Dict[str, Any]]:
-        rows_out: List[Dict[str, Any]] = []
-        n = len(y_true)
-        if len(y_hat) != n:
-            raise ValueError(f"Length mismatch {split_name}: y={n} pred={len(y_hat)}")
-        if model_type in ("lstm", "rnn"):
-            if seq_n_steps is None:
-                raise ValueError("seq_n_steps required for sequence models")
-            for i in range(n):
-                row_idx = seq_n_steps + i
-                if row_idx >= len(split_df):
-                    raise ValueError(f"{split_name}: prediction index out of range")
-                dt_val = split_df.iloc[row_idx][TIMESTAMP_COLUMN] if TIMESTAMP_COLUMN in split_df.columns else pd.NaT
-                act = float(y_true[i])
-                prd = float(y_hat[i])
-                rows_out.append(
-                    {
-                        "split": split_name,
-                        "dt": dt_val,
-                        "actual": act,
-                        "predicted": prd,
-                        "residual": act - prd,
-                    }
-                )
-        else:
-            for i in range(n):
-                dt_val = split_df.iloc[i][TIMESTAMP_COLUMN] if TIMESTAMP_COLUMN in split_df.columns else pd.NaT
-                act = float(y_true[i])
-                prd = float(y_hat[i])
-                rows_out.append(
-                    {
-                        "split": split_name,
-                        "dt": dt_val,
-                        "actual": act,
-                        "predicted": prd,
-                        "residual": act - prd,
-                    }
-                )
-        return rows_out
-
-    pieces = []
-    pieces.extend(_rows_for_split("train", train_split, y_train, train_pred))
-    pieces.extend(_rows_for_split("validation", val_split, y_val, val_pred))
-    return pd.DataFrame(pieces)
-
-
-def write_actual_vs_predicted_plot(
-    frame: pd.DataFrame,
-    out_path: Path,
-    model_type: str,
-    max_points_per_split: int = 10_000,
-) -> None:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharex=False, sharey=False)
-    for ax, split_name, title in (
-        (axes[0], "train", "Train"),
-        (axes[1], "validation", "Validation"),
-    ):
-        sub = frame[frame["split"] == split_name]
-        if len(sub) == 0:
-            ax.set_title(f"{title} (no rows)")
-            ax.text(0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes)
-            continue
-        plot_sub = sub
-        if len(plot_sub) > max_points_per_split:
-            plot_sub = plot_sub.sample(n=max_points_per_split, random_state=42)
-        ax.scatter(plot_sub["actual"], plot_sub["predicted"], s=4, alpha=0.35)
-        lo = float(min(plot_sub["actual"].min(), plot_sub["predicted"].min()))
-        hi = float(max(plot_sub["actual"].max(), plot_sub["predicted"].max()))
-        if lo == hi:
-            lo -= 1.0
-            hi += 1.0
-        ax.plot([lo, hi], [lo, hi], "k--", lw=1.0)
-        ax.set_xlabel("Actual")
-        ax.set_ylabel("Predicted")
-        ax.set_title(f"{title} (n={len(sub)})")
-        ax.set_aspect("equal", adjustable="box")
-    fig.suptitle(f"Actual vs predicted — {model_type}")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120, bbox_inches="tight")
-    plt.close(fig)
 
 
 def _load_supabase_train_test(config: ModelConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -415,30 +312,6 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     if show_progress:
         print(f"  [train]     ✓ done — total {_fmt_sec(t3 - t0)}", flush=True)
 
-    seq_n_steps: Optional[int] = None
-    if model_type in ("lstm", "rnn"):
-        seq_n_steps = int(bundle.n_steps)
-
-    predictions_frame = _build_predictions_frame(
-        model_type=model_type,
-        train_split=train_split,
-        val_split=val_split,
-        y_train=y_train,
-        train_pred=train_pred,
-        y_val=y_val,
-        val_pred=val_pred,
-        seq_n_steps=seq_n_steps,
-    )
-
-    preview_dir = Path(config.persistence["artifact_dir"]) / "training_preview"
-    preview_path = preview_dir / "actual_vs_predicted.png"
-    diagnostics_preview_path: Optional[str] = None
-    try:
-        write_actual_vs_predicted_plot(predictions_frame, preview_path, model_type)
-        diagnostics_preview_path = str(preview_path.resolve())
-    except Exception as exc:
-        warnings.warn(f"Could not write prediction diagnostics plot: {exc}", UserWarning, stacklevel=2)
-
     return TrainingResult(
         model_type=model_type,
         model_bundle=bundle,
@@ -454,8 +327,6 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
             "y_val": tuple(y_val.shape),
         },
         durations_sec=durations_sec,
-        predictions_frame=predictions_frame,
-        diagnostics_preview_path=diagnostics_preview_path,
     )
 
 
@@ -639,12 +510,7 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
     return float(pred)
 
 
-def persist_training_result(
-    result: TrainingResult,
-    config: ModelConfig,
-    run_id: str | None = None,
-    export_predictions_csv_dir: Path | str | None = None,
-) -> Dict[str, str]:
+def persist_training_result(result: TrainingResult, config: ModelConfig, run_id: str | None = None) -> Dict[str, str]:
     artifact_root = config.persistence["artifact_dir"]
     out_dir = prepare_artifact_dir(artifact_root, result.model_type, run_id=run_id)
 
@@ -703,18 +569,11 @@ def persist_training_result(
         manifest["rnn_scaler_path"] = RNN_SCALER_FILENAME if rnn_std else None
     manifest_path = write_manifest(out_dir, manifest)
 
-    out_paths: Dict[str, str] = {
+    return {
         "artifact_dir": str(out_dir),
         "manifest_path": str(manifest_path),
         "model_path": str(out_dir / model_rel),
     }
-    if export_predictions_csv_dir is not None and result.predictions_frame is not None:
-        csv_dir = Path(export_predictions_csv_dir)
-        csv_dir.mkdir(parents=True, exist_ok=True)
-        csv_path = csv_dir / "actual_vs_predicted.csv"
-        result.predictions_frame.to_csv(csv_path, index=False)
-        out_paths["predictions_csv_path"] = str(csv_path.resolve())
-    return out_paths
 
 
 def load_training_bundle_from_manifest(manifest_path: str):
