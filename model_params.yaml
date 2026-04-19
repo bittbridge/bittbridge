@@ -1,11 +1,11 @@
 # Defaults are OFF, so experiment and enable combinations deliberately
 # Keep track of your experiments to see what affects performance to find the sweet spot.
 # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
-    # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
+# Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
     
 features:
   # Calendar fields: hour, minute, dayofweek, month
-  use_time_features: false
+  use_time_features: true
 
   # Raw per-station weather columns. 
   # Empty = drop ALL of these (default).
