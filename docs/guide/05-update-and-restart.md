@@ -20,6 +20,13 @@ Quick reference for the shell on your VM (run these inside SSH):
 | `cat file` | Print `file` contents to the terminal (read-only). |
 |Arrow UP / DOWN | Find previously used commands |
 | CTRL+R | Search for previously used commands |
+|Press Ctrl + b, then [ |Scroll in Tmux session|
+
+To scroll using only your keyboard:
+Enter Scroll Mode: Press Ctrl + b, then [.
+Navigate: Use the Arrow Keys, Page Up, or Page Down.
+Jump to Top/Bottom: Use g for the very top and G for the bottom (if using Vi mode).
+Exit: Press q or Enter to return to the active prompt. 
 
 ---
 
