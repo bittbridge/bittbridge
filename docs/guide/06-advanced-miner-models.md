@@ -40,6 +40,12 @@ Work only in the sections below:
 Save in nano: **Ctrl+O**, Enter; exit: **Ctrl+X**.
 
 ---
+## Attach to Tmux Session
+```bash
+tmux a -t miner
+```
+
+---
 
 ## Run the miner (same command as step 4)
 
