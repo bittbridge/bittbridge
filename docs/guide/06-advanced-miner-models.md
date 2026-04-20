@@ -62,6 +62,36 @@ When the miner starts, it runs a short **interactive** setup:
 4. When asked whether to **deploy** the trained model, confirm if you want the miner to serve that model to validators.
 
 ---
+## How to download files on CSV actual vs predicted example
+> CSV actual vs predicted is saved during each model training session run in artifacts folder under bittbridge directory
+
+1. Navigating to folder with needed file
+```bash
+cd artifacts
+```
+2. Navigate to model run 
+```bash
+# EXAMPPLE ONLY, YOU WILL HAVE DIFFERENT NAME
+cd 20260418T192815Z_linear_miner
+```   
+3. Get real path of a file
+```bash
+realpath actual_vs_predicted.csv
+```
+
+<img width="954" height="547" alt="Screenshot 2026-04-20 at 10 24 11 AM" src="https://github.com/user-attachments/assets/869984eb-56ef-407b-809b-5f75a74fd3cd" />
+
+4. Select Download file
+   
+<img width="953" height="399" alt="Screenshot 2026-04-20 at 10 23 45 AM" src="https://github.com/user-attachments/assets/4e3e3684-e7fa-428d-8a3a-acfab105e540" />
+
+6. Enter the full path and click Download
+
+<img width="365" height="241" alt="Screenshot 2026-04-20 at 10 25 22 AM" src="https://github.com/user-attachments/assets/0a1db6fc-7f4c-4865-b6b4-8b669f753314" />
+
+### !! Sometimes it's not working, just refresh your terminal webpage with Ctrl+R !!
+
+---
 
 ## !! If something gets stuck !!
 
