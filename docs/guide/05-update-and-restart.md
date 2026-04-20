@@ -22,8 +22,10 @@ Quick reference for the shell on your VM (run these inside SSH):
 | CTRL+R | Search for previously used commands |
 |Press Ctrl + b, then [ |Scroll in Tmux session|
 
-> To scroll: Press Ctrl + b, then [.
-> Navigate: Use the Arrow Keys, Page Up, or Page Down.
+> To scroll: Press Ctrl + b, then [
+
+> Navigate: Use the Arrow Keys, Page Up, or Page Down
+
 > Exit: Press q
 
 ---
