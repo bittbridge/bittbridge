@@ -144,6 +144,8 @@ def load_model_config(path: str) -> ModelConfig:
     if source == "csv":
         data["train_csv"] = _require_path(train_csv or "", "data.train_csv")
         data["test_csv"] = _require_path(test_csv or "", "data.test_csv")
+        # Same-row y unless YAML sets a horizon (keeps local/CSV tests stable).
+        data["forecast_horizon_min"] = int(data.get("forecast_horizon_min", 0))
     else:
         if train_csv:
             data["train_csv"] = _require_path(train_csv, "data.train_csv")

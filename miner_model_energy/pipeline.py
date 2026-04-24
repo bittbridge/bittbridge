@@ -17,7 +17,7 @@ from .artifacts import (
     write_config_snapshot,
     write_manifest,
 )
-from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN, load_train_test
+from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN, load_train_test
 from .features import (
     add_engineered_features,
     add_test_load_features_from_history,
@@ -59,6 +59,33 @@ class TrainingResult:
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
     return frame[features].astype(float).to_numpy()
+
+
+def _forecast_horizon_steps(train: pd.DataFrame, horizon_min: int) -> int:
+    """
+    Map forecast_horizon_min to a row offset using median dt spacing.
+    ISO-NE-style data is often 5-minute; irregular gaps make shift(-k) approximate.
+    """
+    if horizon_min <= 0:
+        return 0
+    if len(train) < 2:
+        raise ValueError(
+            "Need at least 2 training rows to infer timestep spacing for forecast horizon."
+        )
+    diffs = train[TIMESTAMP_COLUMN].diff().dt.total_seconds() / 60.0
+    median_minutes = float(diffs.median(skipna=True))
+    if not np.isfinite(median_minutes) or median_minutes <= 0:
+        raise ValueError(
+            "Could not infer a positive median `dt` spacing from training data; "
+            "check `dt` column and sort order."
+        )
+    steps = int(round(float(horizon_min) / median_minutes))
+    if steps < 1:
+        raise ValueError(
+            f"forecast_horizon_min={horizon_min} with median row spacing {median_minutes:.4f} minutes "
+            "implies < 1 step; increase horizon or fix data cadence."
+        )
+    return steps
 
 
 def _fmt_sec(seconds: float) -> str:
@@ -211,6 +238,8 @@ def prepare_training_data(
             flush=True,
         )
     train, test = _load_train_test_by_source(config)
+    train = train.sort_values(TIMESTAMP_COLUMN, kind="mergesort").reset_index(drop=True)
+    test = test.sort_values(TIMESTAMP_COLUMN, kind="mergesort").reset_index(drop=True)
     if source in {"supabase", "supabase_storage"} and show_progress:
         print(
             f"  [train]     Supabase data pulled: train_shape={train.shape}, test_shape={test.shape}",
@@ -250,7 +279,23 @@ def prepare_training_data(
             "list suffixes under include_weather_suffix_groups, and ensure the test CSV can "
             "produce the same columns. Check model_params.yaml toggles and CSV schemas."
         )
+    horizon_min = int(config.data.get("forecast_horizon_min", 0))
+    steps = _forecast_horizon_steps(train, horizon_min)
+    if steps > 0:
+        train[TARGET_COLUMN_HORIZON] = train[TARGET_COLUMN].shift(-steps)
+        if show_progress:
+            median_m = float(
+                train[TIMESTAMP_COLUMN].diff().dt.total_seconds().div(60.0).median(skipna=True)
+            )
+            print(
+                f"  [train]     Horizon target: forecast_horizon_min={horizon_min}, "
+                f"median_dt_min={median_m:.4f}, steps={steps} → `{TARGET_COLUMN_HORIZON}`",
+                flush=True,
+            )
+
     required_train_cols = features + [TARGET_COLUMN]
+    if steps > 0:
+        required_train_cols = features + [TARGET_COLUMN, TARGET_COLUMN_HORIZON]
     train_model = train.dropna(subset=required_train_cols).reset_index(drop=True)
     if train_model.empty:
         raise ValueError("Training frame is empty after feature engineering and dropna.")
@@ -282,10 +327,11 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     train_split, val_split = temporal_train_val_split(
         train_model, validation_split=config.training["validation_split"]
     )
+    y_col = TARGET_COLUMN_HORIZON if TARGET_COLUMN_HORIZON in train_model.columns else TARGET_COLUMN
     X_train = _as_numpy(train_split, features)
-    y_train = train_split[TARGET_COLUMN].to_numpy()
+    y_train = train_split[y_col].to_numpy()
     X_val = _as_numpy(val_split, features)
-    y_val = val_split[TARGET_COLUMN].to_numpy()
+    y_val = val_split[y_col].to_numpy()
     X_test = test[features].astype(float).to_numpy()
     t2 = time.perf_counter()
     if show_progress:

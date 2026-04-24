@@ -103,6 +103,7 @@ data:
   supabase_schema: hackathon
   supabase_train_table: hackathon-train-data
   supabase_test_table: hackathon-test-data
+  # Minutes ahead for the challenge target; used for Supabase test-row fetch and training label shift.
   forecast_horizon_min: 360
   supabase_page_size: 1000
   # Optional training cache based on your public Supabase Storage CSV dumps.
