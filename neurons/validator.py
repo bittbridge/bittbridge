@@ -70,19 +70,27 @@ class Validator(BaseValidatorNeuron):
         except Exception:
             self.hotkeys = {}
 
+        legacy_pending_count = len(getattr(self, "prediction_queue", []))
         self.prediction_queue = []  # Store pending predictions here
+        bt.logging.info(
+            f"[VALIDATOR] Cleared {legacy_pending_count} legacy pending predictions on startup"
+        )
 
     async def forward(self):
         """
         The forward pass for the validator. Delegates logic to bittbridge.validator.forward.forward().
         """
         return await forward(self)
-    # Evaluation loop to process predictions after a delay and assign rewards using incentive mechanism
-    # evaluation_delay: the delay in seconds after which the predictions are processed
-    async def evaluation_loop(self, evaluation_delay=600, check_interval=10):
+    # Evaluation loop to process predictions once target timestamp + grace is reached.
+    async def evaluation_loop(self, check_interval=10, ground_truth_grace_minutes=5):
+        grace_seconds = ground_truth_grace_minutes * 60
         while True:
             now = time.time()
-            ready = [p for p in self.prediction_queue if now - p["request_time"] >= evaluation_delay]
+            ready = []
+            for prediction in self.prediction_queue:
+                target_posix = to_datetime(prediction["timestamp"]).timestamp()
+                if now >= target_posix + grace_seconds:
+                    ready.append(prediction)
             
             # Initialize W&B data collection
             wb_responses = []
@@ -235,7 +243,7 @@ async def prediction_scheduler(validator):
 
 async def main():
     validator = Validator()
-    eval_task = asyncio.create_task(validator.evaluation_loop(evaluation_delay=600, check_interval=10))
+    eval_task = asyncio.create_task(validator.evaluation_loop(check_interval=10, ground_truth_grace_minutes=5))
     pred_task = asyncio.create_task(prediction_scheduler(validator))
     resync_task = asyncio.create_task(metagraph_resync_scheduler(validator, resync_interval=60))
     await asyncio.gather(eval_task, pred_task, resync_task)

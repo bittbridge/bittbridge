@@ -103,7 +103,7 @@ data:
   supabase_schema: hackathon
   supabase_train_table: hackathon-train-data
   supabase_test_table: hackathon-test-data
-  forecast_horizon_min: 5
+  forecast_horizon_min: 360
   supabase_page_size: 1000
   # Optional training cache based on your public Supabase Storage CSV dumps.
   # Set `data.source: supabase_storage` to enable.
