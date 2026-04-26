@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import logging
 import time
 import warnings
 from pathlib import Path
@@ -39,6 +40,8 @@ from .supabase_io import (
     normalize_supabase_test_frame,
 )
 from .storage_train_io import load_train_from_storage_parts
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -570,6 +573,13 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
             "Supabase live inference found no forecast row "
             f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
         )
+    logger.info(
+        "Supabase live row selected: requested_timestamp=%s requested_horizon_min=%s selected_dt=%s selected_horizon_min=%s",
+        timestamp_str,
+        horizon,
+        forecast_row.get(TIMESTAMP_COLUMN),
+        forecast_row.get("horizon_min"),
+    )
 
     forecast_frame = normalize_supabase_test_frame(pd.DataFrame([forecast_row]))
     suffix_whitelist = config.features.get("include_weather_suffix_groups")
