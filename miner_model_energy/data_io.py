@@ -6,6 +6,8 @@ import pandas as pd
 
 
 TARGET_COLUMN = "Total Load"
+# Supervised label: load at dt + forecast_horizon (not present on inference test rows).
+TARGET_COLUMN_HORIZON = "target_load_horizon"
 TIMESTAMP_COLUMN = "dt"
 
 

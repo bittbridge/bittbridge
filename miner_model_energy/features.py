@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from .data_io import TARGET_COLUMN, TIMESTAMP_COLUMN
+from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN
 
 # Raw ISO-NE-style columns are named "<station>-<suffix>". Used for optional whitelist filtering.
 KNOWN_WEATHER_SUFFIXES = frozenset({"tmpf", "dwpf", "relh", "sped", "drct"})
@@ -15,6 +15,7 @@ DEFAULT_ROLLING_WINDOWS = [3, 6]
 DEFAULT_EXCLUDE_COLS = {
     TIMESTAMP_COLUMN,
     TARGET_COLUMN,
+    TARGET_COLUMN_HORIZON,
     "Native Load",
     "Asset Related Load",
     "Total Load With Estimated Solar",

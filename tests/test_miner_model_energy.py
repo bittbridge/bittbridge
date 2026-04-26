@@ -20,6 +20,7 @@ from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import ModelConfig, load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
+from miner_model_energy.data_io import TARGET_COLUMN_HORIZON
 from miner_model_energy.pipeline import (
     TrainingResult,
     _required_history_rows_for_live,
@@ -238,6 +239,7 @@ def test_relative_artifact_dir_resolves_next_to_config_file(tmp_path):
     loaded = load_model_config(str(cfg_path))
     assert loaded.persistence["config_file"] == str(cfg_path.resolve())
     assert loaded.persistence["artifact_dir"] == str((nest / "artifacts").resolve())
+    assert loaded.data["forecast_horizon_min"] == 0
 
 
 def test_cart_training(tmp_path):
@@ -545,6 +547,15 @@ def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail()
     assert needed == 32
 
 
+def test_prepare_training_data_csv_has_no_horizon_target_by_default(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(tmp_path, train_path, test_path)
+    cfg = load_model_config(str(cfg_path))
+    train_model_frame, _, _ = prepare_training_data(cfg, show_progress=False)
+    assert cfg.data["forecast_horizon_min"] == 0
+    assert TARGET_COLUMN_HORIZON not in train_model_frame.columns
+
+
 def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):
     train_rows = []
     start = datetime(2026, 4, 13, 20, 0, 0)
@@ -601,6 +612,12 @@ def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):
     assert len(test_frame) == 1
     assert "Total Load" in train_model_frame.columns
     assert "4B8-tmpf" in features
+    assert TARGET_COLUMN_HORIZON in train_model_frame.columns
+    # 5 min spacing + forecast_horizon_min=5 => 1 step ahead
+    assert len(train_model_frame) == 49
+    assert int(train_model_frame[TARGET_COLUMN_HORIZON].iloc[0]) == int(
+        train_model_frame["Total Load"].iloc[0] + 1
+    )
 
 
 def test_storage_cache_miss_downloads_and_writes_cache(tmp_path, monkeypatch):
