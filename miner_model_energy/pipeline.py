@@ -572,11 +572,11 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
             f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
         )
     bt.logging.info(
-        "[LIVE_ROW] requested_timestamp=%s requested_horizon_min=%s selected_dt=%s selected_horizon_min=%s",
-        timestamp_str,
-        horizon,
-        forecast_row.get(TIMESTAMP_COLUMN),
-        forecast_row.get("horizon_min"),
+        "[LIVE_ROW] "
+        f"requested_timestamp={timestamp_str} "
+        f"requested_horizon_min={horizon} "
+        f"selected_dt={forecast_row.get(TIMESTAMP_COLUMN)} "
+        f"selected_horizon_min={forecast_row.get('horizon_min')}"
     )
 
     forecast_frame = normalize_supabase_test_frame(pd.DataFrame([forecast_row]))
