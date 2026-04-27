@@ -140,15 +140,16 @@ def fetch_supabase_test_row(
             return None
         has_horizon = any((row.get("horizon_min") is not None) for row in candidates)
         if has_horizon:
-            matches = []
             for row in candidates:
                 value = row.get("horizon_min")
                 if value is None:
                     continue
                 if int(value) == int(horizon_min):
-                    matches.append(row)
-            if matches:
-                return matches[0]
+                    return row
+            # Strict behavior: if horizon_min exists on returned rows but none match,
+            # do not silently use a different horizon forecast.
+            return None
+        # Backward compatibility for legacy rows without horizon_min.
         return candidates[0]
 
     candidate_ts = timestamp_candidates_for_supabase(dt_target)
