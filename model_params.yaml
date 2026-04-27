@@ -12,28 +12,28 @@ features:
   # tmpf = air temperature (°F), dwpf = dewpoint, relh = relative humidity,
   # sped = wind speed, drct = wind direction (degrees).
   # To use every group: [tmpf, dwpf, relh, sped, drct]
-  include_weather_suffix_groups: []
+  include_weather_suffix_groups: [tmpf, dwpf, relh, sped, drc]
 
   # hour + minute-of-day sine/cosine encodings
-  use_cyclical_features: false
+  use_cyclical_features: true
   
   # Per-station temperature / humidity / wind-speed aggregates (mean, std, min/max where applicable)
   # Add this if you want to use the temperature and humidity data to predict the load.
-  use_station_agg_features: false
+  use_station_agg_features: true
 
   # Per-station (tmpf - dwpf) plus mean/std across stations when pairs exist
-  use_temp_dew_gap: false
+  use_temp_dew_gap: true
 
   # Past Total Load columns load_lag_<k> (k rows back; 5-min cadence ⇒ k=12 is one hour).
-  use_load_lags: false
+  use_load_lags: true
 
   # Shifted rolling stats on load + load_delta_1/3/12 (notebook-style; exclusive with standalone deltas below).
-  use_load_rolling: false
+  use_load_rolling: true
 
   # Standalone load_delta_1 and load_delta_12 when use_load_rolling is false.
-  use_load_delta: false
-  load_lag_steps: [24]
-  rolling_load_windows: [3, 6]
+  use_load_delta: true
+  load_lag_steps: [72, 144, 288]
+  rolling_load_windows: [12, 24, 72]
 
 # validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART / RNN / LSTM.
 # show_training_progress: phased [train] logs + timings; linear/cart have no intra-fit bar (sklearn).
@@ -52,10 +52,10 @@ models:
     min_samples_leaf: 5
   
   lstm:
-    n_steps: 1
-    units: 32
-    dropout: 0.1
-    epochs: 5
+    n_steps: 12
+    units: 64
+    dropout: 0.15
+    epochs: 10
     batch_size: 16
     # Hidden Dense after LSTM (notebook-style). Set to 0 for LSTM → Dropout → Dense(1) only.
     dense_units: 16
@@ -64,22 +64,22 @@ models:
     use_early_stopping: true
     early_stopping_patience: 2
     # Fit StandardScaler on training rows (per feature) before sequences; same transform at inference.
-    standardize_inputs: false
+    standardize_inputs: true
     # Keras model.fit verbosity: 0=silent, 1=progress bar + ETA per epoch, 2=one line per epoch
     fit_verbose: 1
 
   # Keras SimpleRNN (vanilla RNN). Same hyperparameter shape as lstm; see lstm block for OOM hints.
   rnn:
-    n_steps: 1
+    n_steps: 12
     units: 32
     dropout: 0.1
-    epochs: 5
+    epochs: 8
     batch_size: 16
     dense_units: 16
     learning_rate: 0.001
     use_early_stopping: true
     early_stopping_patience: 2
-    standardize_inputs: false
+    standardize_inputs: true
     fit_verbose: 1
 
 # Artifacts are written under this directory next to model_params.yaml (relative paths resolve to the YAML folder).
