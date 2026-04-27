@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import bittensor as bt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -570,6 +571,13 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
             "Supabase live inference found no forecast row "
             f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
         )
+    bt.logging.info(
+        "[LIVE_ROW] "
+        f"requested_timestamp={timestamp_str} "
+        f"requested_horizon_min={horizon} "
+        f"selected_dt={forecast_row.get(TIMESTAMP_COLUMN)} "
+        f"selected_horizon_min={forecast_row.get('horizon_min')}"
+    )
 
     forecast_frame = normalize_supabase_test_frame(pd.DataFrame([forecast_row]))
     suffix_whitelist = config.features.get("include_weather_suffix_groups")
