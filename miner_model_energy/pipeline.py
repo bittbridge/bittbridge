@@ -7,10 +7,24 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import bittensor as bt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+try:
+    import bittensor as bt
+except ModuleNotFoundError:  # pragma: no cover - local ML tests can run without miner deps.
+    class _NoopLogging:
+        def __getattr__(self, _name):
+            def _log(*_args, **_kwargs):
+                return None
+
+            return _log
+
+    class _BittensorShim:
+        logging = _NoopLogging()
+
+    bt = _BittensorShim()
 
 from .artifacts import (
     feature_signature,
@@ -168,7 +182,7 @@ def print_actual_vs_predicted_plotext(result: TrainingResult, model_label: str) 
             plt.scatter(xa, yb, label="model")
             plt.xlabel("actual")
             plt.ylabel("predicted")
-            plt.title(f"{model_label} — Actual vs predicted ({title_suffix})")
+            plt.title(f"{model_label} - Actual vs predicted ({title_suffix})")
             plt.show()
     except Exception as exc:
         print(f"  Warning: could not render plotext charts ({exc}).")
@@ -293,7 +307,7 @@ def prepare_training_data(
             )
             print(
                 f"  [train]     Horizon target: forecast_horizon_min={horizon_min}, "
-                f"median_dt_min={median_m:.4f}, steps={steps} → `{TARGET_COLUMN_HORIZON}`",
+                f"median_dt_min={median_m:.4f}, steps={steps} -> `{TARGET_COLUMN_HORIZON}`",
                 flush=True,
             )
 
@@ -319,17 +333,17 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
 
     t0 = time.perf_counter()
     if show_progress:
-        print("  [train] (1/4) Loading CSVs and building features…", flush=True)
+        print("  [train] (1/4) Loading CSVs and building features...", flush=True)
     train_model, test, features = prepare_training_data(config, show_progress=show_progress)
     horizon_min = int(config.data.get("forecast_horizon_min", 0))
     horizon_steps = _forecast_horizon_steps(train_model, horizon_min) if horizon_min > 0 else 0
     t1 = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     ✓ {_fmt_sec(t1 - t0)} — {len(train_model):,} rows, {len(features)} features",
+            f"  [train]     done {_fmt_sec(t1 - t0)} - {len(train_model):,} rows, {len(features)} features",
             flush=True,
         )
-        print("  [train] (2/4) Building arrays and temporal train/val split…", flush=True)
+        print("  [train] (2/4) Building arrays and temporal train/val split...", flush=True)
     train_split, val_split = temporal_train_val_split(
         train_model, validation_split=config.training["validation_split"]
     )
@@ -342,13 +356,13 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     t2 = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     ✓ {_fmt_sec(t2 - t1)} — train {X_train.shape}, val {X_val.shape}",
+            f"  [train]     done {_fmt_sec(t2 - t1)} - train {X_train.shape}, val {X_val.shape}",
             flush=True,
         )
 
     rs = int(config.training.get("random_state", 42))
     if show_progress:
-        print(f"  [train] (3/4) Training {model_type} (fit + train/val predictions)…", flush=True)
+        print(f"  [train] (3/4) Training {model_type} (fit + train/val predictions)...", flush=True)
 
     t_fit_start = time.perf_counter()
     if model_type == "linear":
@@ -411,10 +425,10 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     t_fit_end = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     ✓ step (3/4) done in {_fmt_sec(t_fit_end - t_fit_start)}",
+            f"  [train]     step (3/4) done in {_fmt_sec(t_fit_end - t_fit_start)}",
             flush=True,
         )
-        print("  [train] (4/4) Aggregating train/validation metrics…", flush=True)
+        print("  [train] (4/4) Aggregating train/validation metrics...", flush=True)
 
     metrics = {
         "train": _metrics(y_train, train_pred),
@@ -430,7 +444,7 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         "total_sec": t3 - t0,
     }
     if show_progress:
-        print(f"  [train]     ✓ done — total {_fmt_sec(t3 - t0)}", flush=True)
+        print(f"  [train]     done - total {_fmt_sec(t3 - t0)}", flush=True)
 
     return TrainingResult(
         model_type=model_type,

@@ -4,18 +4,34 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
 
-import bittensor as bt
-
-from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
-from bittbridge.utils.timestamp import get_now
-
 from .ml_config import ModelConfig
 from .pipeline import TrainingResult, predict_for_timestamp, predict_single_test_row
+
+try:
+    import bittensor as bt
+except ModuleNotFoundError:  # pragma: no cover - local ML tests can run without miner deps.
+    class _NoopLogging:
+        def __getattr__(self, _name):
+            def _log(*_args, **_kwargs):
+                return None
+
+            return _log
+
+    class _BittensorShim:
+        logging = _NoopLogging()
+
+    bt = _BittensorShim()
 
 DEFAULT_FALLBACK_LOAD_MW = 15000.0
 
 
 def _get_latest_load_values(n_steps: int) -> Optional[list]:
+    try:
+        from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
+        from bittbridge.utils.timestamp import get_now
+    except ModuleNotFoundError:
+        return None
+
     now = get_now()
     today = now.strftime("%Y%m%d")
     data = fetch_fiveminute_system_load(today, use_cache=False)

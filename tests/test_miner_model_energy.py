@@ -14,7 +14,12 @@ import pandas as pd
 import pytest
 import yaml
 
-from neurons import miner as miner_module
+try:
+    from neurons import miner as miner_module
+except ModuleNotFoundError as exc:
+    if exc.name != "bittensor":
+        raise
+    miner_module = None
 from miner_model_energy.artifacts import load_manifest
 from miner_model_energy.features import (
     KNOWN_WEATHER_SUFFIXES,
@@ -264,6 +269,20 @@ def test_predictor_router_switch(tmp_path):
     router.set_predictor(AdvancedModelPredictor(result), mode="advanced:linear")
     value = router.predict("2025-01-01 12:00:00")
     assert isinstance(value, float)
+
+
+def test_predictor_router_returns_default_float_when_primary_and_fallback_fail():
+    class _FailingPredictor:
+        def predict(self, timestamp):
+            raise RuntimeError(f"boom {timestamp}")
+
+    router = PredictorRouter(
+        _FailingPredictor(),
+        fallback_predictor=_FailingPredictor(),
+        default_prediction=12345.0,
+    )
+
+    assert router.predict("2025-01-01 12:00:00") == pytest.approx(12345.0)
 
 
 def test_empty_weather_whitelist_drops_raw_columns(tmp_path):
@@ -934,18 +953,24 @@ def test_storage_cache_rebuild_failure_falls_back_to_existing_cache(tmp_path, mo
 
 
 def test_ask_model_type_preflight_accepts_exit(monkeypatch):
+    if miner_module is None:
+        pytest.skip("bittensor is not installed; skipping full miner preflight import test.")
     monkeypatch.setattr("builtins.input", lambda _prompt: "3")
     with pytest.raises(miner_module.PreflightExitRequested):
         miner_module._ask_model_type_preflight()
 
 
 def test_ask_after_deploy_decline_accepts_exit(monkeypatch):
+    if miner_module is None:
+        pytest.skip("bittensor is not installed; skipping full miner preflight import test.")
     monkeypatch.setattr("builtins.input", lambda _prompt: "3")
     choice = miner_module._ask_after_deploy_decline()
     assert choice == "exit"
 
 
 def test_run_preflight_returns_exit_mode(monkeypatch):
+    if miner_module is None:
+        pytest.skip("bittensor is not installed; skipping full miner preflight import test.")
     def _raise_exit(*_args, **_kwargs):
         raise miner_module.PreflightExitRequested()
 

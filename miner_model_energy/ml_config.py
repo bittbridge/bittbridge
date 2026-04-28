@@ -44,7 +44,7 @@ def _clean_optional_str(value: Any) -> str | None:
 
 
 def _normalize_include_weather_suffix_groups(value: Any) -> List[str]:
-    """Empty list = strip all raw *-tmpf / *-dwpf / … columns. Non-empty = whitelist those suffixes only."""
+    """Empty list = strip all raw *-tmpf / *-dwpf / ... columns. Non-empty = whitelist those suffixes only."""
     if value is None:
         return []
     if not isinstance(value, list):
@@ -110,7 +110,7 @@ def _normalize_keras_sequence_model(models: Dict[str, Any], yaml_key: str) -> No
     if cfg["dense_units"] < 0:
         raise ValueError(
             f"`models.{yaml_key}.dense_units` must be >= 0 "
-            f"(0 = no hidden Dense, only recurrent → Dropout → Dense(1))."
+            f"(0 = no hidden Dense, only recurrent -> Dropout -> Dense(1))."
         )
     cfg["use_early_stopping"] = bool(cfg.get("use_early_stopping", True))
     cfg["early_stopping_patience"] = int(cfg.get("early_stopping_patience", 5))
