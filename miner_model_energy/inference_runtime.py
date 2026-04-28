@@ -4,11 +4,15 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
 
+import bittensor as bt
+
 from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
 from bittbridge.utils.timestamp import get_now
 
 from .ml_config import ModelConfig
 from .pipeline import TrainingResult, predict_for_timestamp, predict_single_test_row
+
+DEFAULT_FALLBACK_LOAD_MW = 15000.0
 
 
 def _get_latest_load_values(n_steps: int) -> Optional[list]:
@@ -55,8 +59,10 @@ class SupabaseLiveAdvancedPredictor:
 
 
 class PredictorRouter:
-    def __init__(self, predictor):
+    def __init__(self, predictor, fallback_predictor=None, default_prediction: float = DEFAULT_FALLBACK_LOAD_MW):
         self._predictor = predictor
+        self._fallback_predictor = fallback_predictor or BaselineMovingAveragePredictor()
+        self._default_prediction = float(default_prediction)
         self.mode = "baseline"
 
     def set_predictor(self, predictor, mode: str):
@@ -64,5 +70,30 @@ class PredictorRouter:
         self.mode = mode
 
     def predict(self, timestamp: str) -> Optional[float]:
-        return self._predictor.predict(timestamp)
+        try:
+            value = self._predictor.predict(timestamp)
+            if value is not None:
+                return float(value)
+            bt.logging.warning(
+                f"[{self.mode}] Predictor returned no value for timestamp={timestamp}; using fallback."
+            )
+        except Exception as exc:
+            bt.logging.error(
+                f"[{self.mode}] Predictor failed for timestamp={timestamp}; using fallback: {exc}"
+            )
+
+        try:
+            fallback_value = self._fallback_predictor.predict(timestamp)
+            if fallback_value is not None:
+                return float(fallback_value)
+            bt.logging.warning(
+                f"Fallback predictor returned no value for timestamp={timestamp}; "
+                f"using default {self._default_prediction:.1f}."
+            )
+        except Exception as exc:
+            bt.logging.error(
+                f"Fallback predictor failed for timestamp={timestamp}; "
+                f"using default {self._default_prediction:.1f}: {exc}"
+            )
+        return self._default_prediction
 

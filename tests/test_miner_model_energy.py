@@ -16,7 +16,12 @@ import yaml
 
 from neurons import miner as miner_module
 from miner_model_energy.artifacts import load_manifest
-from miner_model_energy.features import KNOWN_WEATHER_SUFFIXES
+from miner_model_energy.features import (
+    KNOWN_WEATHER_SUFFIXES,
+    MIN_LOAD_LAG_STEPS,
+    add_engineered_features,
+    add_test_load_features_from_history,
+)
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import ModelConfig, load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
@@ -55,7 +60,7 @@ def _weather_row(i: int, start: datetime) -> dict:
 
 def _write_dataset(tmp_path):
     start = datetime(2025, 1, 1, 0, 0, 0)
-    rows = [_weather_row(i, start) for i in range(96)]
+    rows = [_weather_row(i, start) for i in range(240)]
     train = pd.DataFrame(rows)
     test = train.tail(1).drop(columns=["Total Load"]).copy()
     train_path = tmp_path / "train.csv"
@@ -74,7 +79,7 @@ def _default_features():
         "use_load_lags": False,
         "use_load_rolling": False,
         "use_load_delta": False,
-        "load_lag_steps": [1, 2, 3],
+        "load_lag_steps": [MIN_LOAD_LAG_STEPS],
         "rolling_load_windows": [3, 6, 12],
         # Whitelist all raw weather columns so parametrize cases match pre-filter behavior.
         "include_weather_suffix_groups": sorted(KNOWN_WEATHER_SUFFIXES),
@@ -136,11 +141,11 @@ FEATURE_COMBOS = [
     pytest.param({"use_cyclical_features": True}, id="cyclical"),
     pytest.param({"use_station_agg_features": True}, id="station_agg"),
     pytest.param({"use_temp_dew_gap": True}, id="temp_dew_gap"),
-    pytest.param({"use_load_lags": True, "load_lag_steps": [1, 3]}, id="lags"),
+    pytest.param({"use_load_lags": True, "load_lag_steps": [72, 84]}, id="lags"),
     pytest.param({"use_load_delta": True}, id="delta_only"),
     pytest.param({"use_load_rolling": True, "rolling_load_windows": [3, 6, 12]}, id="rolling"),
     pytest.param(
-        {"use_load_lags": True, "use_load_rolling": True, "load_lag_steps": [1, 2]},
+        {"use_load_lags": True, "use_load_rolling": True, "load_lag_steps": [72, 84]},
         id="lags_and_rolling",
     ),
     pytest.param(
@@ -307,6 +312,96 @@ def test_load_config_rejects_unknown_weather_suffix(tmp_path):
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     with pytest.raises(ValueError, match="unknown suffix"):
         load_model_config(str(path))
+
+
+def test_load_config_rejects_unsafe_load_lag(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"use_load_lags": True, "load_lag_steps": [24]},
+    )
+    with pytest.raises(ValueError, match="unsafe load lag"):
+        load_model_config(str(cfg_path))
+
+
+def test_forecast_horizon_360_creates_72_row_target_shift(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        data_patch={"forecast_horizon_min": 360},
+    )
+    cfg = load_model_config(str(cfg_path))
+    train_model_frame, _, _ = prepare_training_data(cfg, show_progress=False)
+    raw_train = pd.read_csv(train_path)
+
+    assert cfg.data["forecast_horizon_min"] == 360
+    assert TARGET_COLUMN_HORIZON in train_model_frame.columns
+    assert len(train_model_frame) == len(raw_train) - 72
+    assert float(train_model_frame[TARGET_COLUMN_HORIZON].iloc[0]) == float(
+        raw_train["Total Load"].iloc[72]
+    )
+
+    result = train_model("linear", cfg)
+    saved = persist_training_result(result, cfg, run_id="pytest_horizon")
+    manifest = load_manifest(saved["manifest_path"])
+    assert manifest["forecast_horizon_min"] == 360
+    assert manifest["horizon_steps"] == 72
+
+
+def test_rolling_delta_features_shift_by_min_safe_lag():
+    frame = pd.DataFrame(
+        {
+            "dt": pd.date_range("2025-01-01", periods=120, freq="5min"),
+            "Total Load": [float(i) for i in range(120)],
+        }
+    )
+    out = add_engineered_features(
+        frame,
+        {
+            "use_load_rolling": True,
+            "use_load_delta": True,
+            "rolling_load_windows": [3],
+            "use_load_lags": False,
+        },
+    )
+
+    assert out["load_roll_mean_3"].iloc[100] == pytest.approx((26.0 + 27.0 + 28.0) / 3.0)
+    assert out["load_roll_max_3"].iloc[100] == pytest.approx(28.0)
+    assert out["load_delta_1"].iloc[100] == pytest.approx(1.0)
+    assert out["load_delta_3"].iloc[100] == pytest.approx(3.0)
+    assert out["load_delta_12"].iloc[100] == pytest.approx(12.0)
+
+
+def test_test_load_features_from_history_use_min_safe_lag():
+    train = pd.DataFrame(
+        {
+            "dt": pd.date_range("2025-01-01", periods=100, freq="5min"),
+            "Total Load": [float(i) for i in range(100)],
+        }
+    )
+    test = pd.DataFrame({"dt": [pd.Timestamp("2025-01-01 08:20:00")]})
+    out = add_test_load_features_from_history(
+        test,
+        train,
+        {
+            "use_load_lags": True,
+            "load_lag_steps": [72],
+            "use_load_rolling": True,
+            "rolling_load_windows": [3],
+            "use_load_delta": True,
+        },
+    )
+
+    assert out["load_lag_72"].iloc[0] == pytest.approx(28.0)
+    assert out["load_roll_mean_3"].iloc[0] == pytest.approx((26.0 + 27.0 + 28.0) / 3.0)
+    assert out["load_roll_max_3"].iloc[0] == pytest.approx(28.0)
+    assert out["load_delta_1"].iloc[0] == pytest.approx(1.0)
+    assert out["load_delta_3"].iloc[0] == pytest.approx(3.0)
+    assert out["load_delta_12"].iloc[0] == pytest.approx(12.0)
 
 
 def test_rnn_runs_with_feature_patch(tmp_path):
@@ -491,7 +586,7 @@ def test_fetch_supabase_test_row_falls_back_to_local_wall_clock_exact():
     assert int(row["horizon_min"]) == 5
 
 
-def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window():
+def test_required_history_rows_for_live_rnn_load_lag_84_covers_sequence_window():
     """After shift(max_lag), only tail rows are non-NaN in load_lag_*; fetch enough for RNN window."""
 
     class _Bundle:
@@ -510,14 +605,14 @@ def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window()
         data={},
         features={
             "use_load_lags": True,
-            "load_lag_steps": [12, 24],
+            "load_lag_steps": [72, 84],
         },
         training={},
         models={},
         persistence={},
     )
     needed = _required_history_rows_for_live(result, cfg)
-    assert needed >= 24 + 11 + 8  # max_lag + (n_steps - 1) + live_seq_buffer
+    assert needed >= 84 + 11 + 8  # max_lag + (n_steps - 1) + live_seq_buffer
 
 
 def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail():
@@ -537,14 +632,14 @@ def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail()
         data={},
         features={
             "use_load_lags": True,
-            "load_lag_steps": [12, 24],
+            "load_lag_steps": [72, 84],
         },
         training={},
         models={},
         persistence={},
     )
     needed = _required_history_rows_for_live(result, cfg)
-    assert needed == 32
+    assert needed == 86
 
 
 def test_prepare_training_data_csv_has_no_horizon_target_by_default(tmp_path):

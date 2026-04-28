@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import yaml
 
-from .features import KNOWN_WEATHER_SUFFIXES
+from .features import KNOWN_WEATHER_SUFFIXES, MIN_LOAD_LAG_STEPS
 
 
 @dataclass(frozen=True)
@@ -206,11 +206,19 @@ def load_model_config(path: str) -> ModelConfig:
     for key in FEATURE_BOOL_KEYS:
         features[key] = bool(features.get(key, False))
 
-    default_lags = [1, 2, 3, 6, 12]
+    default_lags = [MIN_LOAD_LAG_STEPS]
     default_rolling = [3, 6, 12, 24]
     features["load_lag_steps"] = _as_int_list(
         features.get("load_lag_steps"), "features.load_lag_steps", default_lags
     )
+    if features.get("use_load_lags", False):
+        unsafe_lags = [lag for lag in features["load_lag_steps"] if int(lag) < MIN_LOAD_LAG_STEPS]
+        if unsafe_lags:
+            raise ValueError(
+                "`features.load_lag_steps` contains unsafe load lag(s) "
+                f"{unsafe_lags}; 6-hour prediction requires all load lags to be >= "
+                f"{MIN_LOAD_LAG_STEPS} rows."
+            )
     features["rolling_load_windows"] = _as_int_list(
         features.get("rolling_load_windows"),
         "features.rolling_load_windows",

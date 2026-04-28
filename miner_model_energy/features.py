@@ -10,7 +10,8 @@ from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN
 # Raw ISO-NE-style columns are named "<station>-<suffix>". Used for optional whitelist filtering.
 KNOWN_WEATHER_SUFFIXES = frozenset({"tmpf", "dwpf", "relh", "sped", "drct"})
 
-DEFAULT_LAGS = [1, 2]
+MIN_LOAD_LAG_STEPS = 72
+DEFAULT_LAGS = [MIN_LOAD_LAG_STEPS]
 DEFAULT_ROLLING_WINDOWS = [3, 6]
 DEFAULT_EXCLUDE_COLS = {
     TIMESTAMP_COLUMN,
@@ -149,7 +150,7 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
 
         if feature_cfg.get("use_load_rolling", False):
             windows = feature_cfg.get("rolling_load_windows", DEFAULT_ROLLING_WINDOWS)
-            shifted_load = out[TARGET_COLUMN].shift(1)
+            shifted_load = out[TARGET_COLUMN].shift(MIN_LOAD_LAG_STEPS)
             for window in windows:
                 w = int(window)
                 roll = shifted_load.rolling(window=w)
@@ -157,12 +158,13 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
                 out[f"load_roll_std_{w}"] = roll.std()
                 out[f"load_roll_min_{w}"] = roll.min()
                 out[f"load_roll_max_{w}"] = roll.max()
-            out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
-            out["load_delta_3"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(4)
-            out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
+            out["load_delta_1"] = shifted_load - shifted_load.shift(1)
+            out["load_delta_3"] = shifted_load - shifted_load.shift(3)
+            out["load_delta_12"] = shifted_load - shifted_load.shift(12)
         elif feature_cfg.get("use_load_delta", False):
-            out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
-            out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
+            shifted_load = out[TARGET_COLUMN].shift(MIN_LOAD_LAG_STEPS)
+            out["load_delta_1"] = shifted_load - shifted_load.shift(1)
+            out["load_delta_12"] = shifted_load - shifted_load.shift(12)
 
     _drop_features_disabled_by_config(out, feature_cfg)
     return out
@@ -249,6 +251,7 @@ def add_test_load_features_from_history(
     out = test_df.copy()
     load_hist = train_df[TARGET_COLUMN].reset_index(drop=True)
     n_hist = len(load_hist)
+    safe_history_end = n_hist - MIN_LOAD_LAG_STEPS + 1
 
     lag_steps = feature_cfg.get("load_lag_steps", DEFAULT_LAGS)
     if feature_cfg.get("use_load_lags", False):
@@ -261,25 +264,38 @@ def add_test_load_features_from_history(
 
     windows = feature_cfg.get("rolling_load_windows", DEFAULT_ROLLING_WINDOWS)
     if feature_cfg.get("use_load_rolling", False):
+        if safe_history_end <= 0:
+            raise ValueError(
+                f"Need at least {MIN_LOAD_LAG_STEPS} rows of history for safe rolling load features."
+            )
+        safe_hist = load_hist.iloc[:safe_history_end]
         for window in windows:
             window = int(window)
-            if n_hist < window:
-                raise ValueError(f"Not enough history for rolling window {window}.")
-            hist_window = load_hist.iloc[-window:]
+            if len(safe_hist) < window:
+                needed = MIN_LOAD_LAG_STEPS + window - 1
+                raise ValueError(f"Need at least {needed} rows of history for rolling window {window}.")
+            hist_window = safe_hist.tail(window)
             out[f"load_roll_mean_{window}"] = float(hist_window.mean())
             out[f"load_roll_std_{window}"] = float(hist_window.std())
             out[f"load_roll_min_{window}"] = float(hist_window.min())
             out[f"load_roll_max_{window}"] = float(hist_window.max())
-        if n_hist < 13:
-            raise ValueError("Need at least 13 rows of history for load_delta features.")
-        out["load_delta_1"] = float(load_hist.iloc[-1] - load_hist.iloc[-2])
-        out["load_delta_3"] = float(load_hist.iloc[-1] - load_hist.iloc[-4])
-        out["load_delta_12"] = float(load_hist.iloc[-1] - load_hist.iloc[-13])
+        if len(safe_hist) < 13:
+            raise ValueError(
+                f"Need at least {MIN_LOAD_LAG_STEPS + 12} rows of history for load_delta features."
+            )
+        out["load_delta_1"] = float(safe_hist.iloc[-1] - safe_hist.iloc[-2])
+        out["load_delta_3"] = float(safe_hist.iloc[-1] - safe_hist.iloc[-4])
+        out["load_delta_12"] = float(safe_hist.iloc[-1] - safe_hist.iloc[-13])
     elif feature_cfg.get("use_load_delta", False):
-        if n_hist < 13:
-            raise ValueError("Need at least 13 rows of history for load_delta_12.")
-        out["load_delta_1"] = float(load_hist.iloc[-1] - load_hist.iloc[-2])
-        out["load_delta_12"] = float(load_hist.iloc[-1] - load_hist.iloc[-13])
+        if safe_history_end <= 0:
+            raise ValueError(
+                f"Need at least {MIN_LOAD_LAG_STEPS} rows of history for safe load_delta features."
+            )
+        safe_hist = load_hist.iloc[:safe_history_end]
+        if len(safe_hist) < 13:
+            raise ValueError(f"Need at least {MIN_LOAD_LAG_STEPS + 12} rows of history for load_delta_12.")
+        out["load_delta_1"] = float(safe_hist.iloc[-1] - safe_hist.iloc[-2])
+        out["load_delta_12"] = float(safe_hist.iloc[-1] - safe_hist.iloc[-13])
 
     return out
 

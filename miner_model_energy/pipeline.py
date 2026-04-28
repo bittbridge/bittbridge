@@ -20,6 +20,7 @@ from .artifacts import (
 )
 from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN, load_train_test
 from .features import (
+    MIN_LOAD_LAG_STEPS,
     add_engineered_features,
     add_test_load_features_from_history,
     build_feature_columns,
@@ -56,6 +57,8 @@ class TrainingResult:
     y_val: np.ndarray = field(default_factory=lambda: np.array([]))
     val_pred: np.ndarray = field(default_factory=lambda: np.array([]))
     durations_sec: Dict[str, float] = field(default_factory=dict)
+    forecast_horizon_min: int = 0
+    horizon_steps: int = 0
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -318,6 +321,8 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     if show_progress:
         print("  [train] (1/4) Loading CSVs and building features…", flush=True)
     train_model, test, features = prepare_training_data(config, show_progress=show_progress)
+    horizon_min = int(config.data.get("forecast_horizon_min", 0))
+    horizon_steps = _forecast_horizon_steps(train_model, horizon_min) if horizon_min > 0 else 0
     t1 = time.perf_counter()
     if show_progress:
         print(
@@ -446,6 +451,8 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         y_val=y_val,
         val_pred=val_pred,
         durations_sec=durations_sec,
+        forecast_horizon_min=horizon_min,
+        horizon_steps=horizon_steps,
     )
 
 
@@ -513,9 +520,18 @@ def _required_history_rows_for_live(result: TrainingResult, config: ModelConfig)
             needed = max(needed, max_lag + (n_steps_seq - 1) + live_seq_buffer)
     if feats_cfg.get("use_load_rolling", False):
         rolling = [int(v) for v in feats_cfg.get("rolling_load_windows", [])]
-        needed = max(needed, max(rolling, default=1) + 2, 16)
+        max_window = max(rolling, default=1)
+        rolling_needed = MIN_LOAD_LAG_STEPS + max_window
+        needed = max(needed, rolling_needed)
+        if n_steps_seq is not None:
+            live_seq_buffer = 8
+            needed = max(needed, rolling_needed + (n_steps_seq - 1) + live_seq_buffer)
     if feats_cfg.get("use_load_delta", False) or feats_cfg.get("use_load_rolling", False):
-        needed = max(needed, 16)
+        delta_needed = MIN_LOAD_LAG_STEPS + 13
+        needed = max(needed, delta_needed)
+        if n_steps_seq is not None:
+            live_seq_buffer = 8
+            needed = max(needed, delta_needed + (n_steps_seq - 1) + live_seq_buffer)
     return int(needed)
 
 
@@ -678,6 +694,8 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "features": result.features,
         "features_count": len(result.features),
         "feature_signature": feature_signature(result.features),
+        "forecast_horizon_min": int(result.forecast_horizon_min),
+        "horizon_steps": int(result.horizon_steps),
         "train_rows": int(len(result.train_frame)),
         "metrics": result.metrics,
         "durations_sec": result.durations_sec,

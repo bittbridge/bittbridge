@@ -32,7 +32,7 @@ features:
 
   # Standalone load_delta_1 and load_delta_12 when use_load_rolling is false.
   use_load_delta: false
-  load_lag_steps: [24]
+  load_lag_steps: [72]
   rolling_load_windows: [3, 6]
 
 # validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART / RNN / LSTM.
