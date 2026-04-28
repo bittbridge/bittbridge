@@ -92,21 +92,14 @@ class Validator(BaseValidatorNeuron):
                 if now >= target_posix + grace_seconds:
                     ready.append(prediction)
             
-            # Initialize W&B data collection
-            wb_responses = []
-            wb_rewards = []
-            wb_uids = []
-            # wb_actuals = []
-            # wb_timestamps = []
-            
             if ready:
                 # Group predictions by timestamp for batch evaluation
                 timestamp_groups = {}
                 for pred in ready:
-                    timestamp = pred["timestamp"]
-                    if timestamp not in timestamp_groups:
-                        timestamp_groups[timestamp] = []
-                    timestamp_groups[timestamp].append(pred)
+                    ts = pred["timestamp"]
+                    if ts not in timestamp_groups:
+                        timestamp_groups[ts] = []
+                    timestamp_groups[ts].append(pred)
                 
                 # Track predictions that were actually evaluated (so we only remove those)
                 processed_preds = []
@@ -119,7 +112,6 @@ class Validator(BaseValidatorNeuron):
                         responses = []
                         miner_uids = []
                         for pred in predictions:
-                            # Create a mock Challenge response
                             response = Challenge(timestamp=timestamp)
                             response.prediction = pred["prediction"]
                             responses.append(response)
@@ -148,17 +140,8 @@ class Validator(BaseValidatorNeuron):
                             self.last_round_weights = {}
 
                         self.update_scores(rewards, miner_uids)
-                        
-                        # Collect data for W&B logging
+
                         for i, pred in enumerate(predictions):
-                            # Add to W&B data collection
-                            wb_responses.append(responses[i])
-                            wb_rewards.append(rewards[i])
-                            wb_uids.append(pred["miner_uid"])
-                            # wb_actuals.append(actual)
-                            # wb_timestamps.append(timestamp)
-                            
-                            # Log detailed results
                             bt.logging.info(
                                 f"[INCENTIVE_MECHANISM_EVAL] UID={pred['miner_uid']}, "
                                 f"Prediction={pred['prediction']}, "
@@ -166,6 +149,33 @@ class Validator(BaseValidatorNeuron):
                                 f"Reward={rewards[i]:.4f}"
                             )
                         processed_preds.extend(predictions)
+
+                        # Log to W&B immediately for this timestamp group so that
+                        # ground_truth and timestamp are always correct for the
+                        # miners being logged — never mixed across groups.
+                        if getattr(self, "_wandb_ok", False):
+                            try:
+                                last_w = getattr(self, "last_round_weights", {})
+                                if not isinstance(last_w, dict):
+                                    last_w = {}
+                                n_scores = len(self.scores)
+                                moving_avgs = {
+                                    int(uid): float(self.scores[int(uid)])
+                                    for uid in miner_uids
+                                    if 0 <= int(uid) < n_scores
+                                }
+                                log_wandb(
+                                    responses=responses,
+                                    rewards=rewards,
+                                    miner_uids=miner_uids,
+                                    hotkeys=getattr(self, "hotkeys", {}),
+                                    moving_average_scores=moving_avgs,
+                                    last_round_weights=last_w,
+                                    ground_truth=actual,
+                                    timestamp=timestamp,
+                                )
+                            except Exception as e:
+                                bt.logging.error(f"W&B log failed: {e}")
                     else:
                         bt.logging.info(
                             f"Actual load not yet available for timestamp={timestamp} - will retry"
@@ -174,33 +184,6 @@ class Validator(BaseValidatorNeuron):
                 # Remove only predictions that were actually evaluated
                 for pred in processed_preds:
                     self.prediction_queue.remove(pred)
-            
-            # Log to W&B if we have data and W&B is available
-            if getattr(self, "_wandb_ok", False) and wb_uids:
-                try:
-                    last_w = getattr(self, "last_round_weights", {})
-                    if not isinstance(last_w, dict):
-                        last_w = {}
-                    n_scores = len(self.scores)
-                    moving_avgs = {
-                        int(uid): float(self.scores[int(uid)])
-                        for uid in wb_uids
-                        if 0 <= int(uid) < n_scores
-                    }
-                    log_wandb(
-                        responses=wb_responses,
-                        rewards=wb_rewards,
-                        miner_uids=wb_uids,
-                        hotkeys=getattr(self, "hotkeys", {}),
-                        moving_average_scores=moving_avgs,
-                        last_round_weights=last_w,
-                        ground_truth=actual,
-                        timestamp=timestamp,
-                        # ground_truth=wb_actuals,
-                        # timestamp=wb_timestamps,
-                    )
-                except Exception as e:
-                    bt.logging.error(f"W&B log failed: {e}")
             
             await asyncio.sleep(check_interval)
 
