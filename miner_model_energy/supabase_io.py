@@ -127,6 +127,33 @@ def fetch_supabase_train_tail(client, schema: str, table: str, n_rows: int) -> p
     return frame.tail(int(n_rows)).reset_index(drop=True)
 
 
+def fetch_supabase_train_tail_before(
+    client,
+    schema: str,
+    table: str,
+    n_rows: int,
+    before_dt: str | pd.Timestamp,
+) -> pd.DataFrame:
+    cutoff = parse_timestamp_for_supabase(str(before_dt))
+    cutoff_text = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+    response = (
+        client.schema(schema)
+        .table(table)
+        .select("*")
+        .lt(TIMESTAMP_COLUMN, cutoff_text)
+        .order(TIMESTAMP_COLUMN, desc=True)
+        .limit(int(n_rows))
+        .execute()
+    )
+    rows = response.data or []
+    if not rows:
+        raise ValueError(
+            f"Supabase `{schema}.{table}` returned no rows before {cutoff_text} for live history."
+        )
+    frame = normalize_supabase_train_frame(pd.DataFrame(rows))
+    return frame.tail(int(n_rows)).reset_index(drop=True)
+
+
 def fetch_supabase_test_row(
     client,
     schema: str,

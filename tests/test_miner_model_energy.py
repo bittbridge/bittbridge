@@ -23,24 +23,28 @@ except ModuleNotFoundError as exc:
 from miner_model_energy.artifacts import load_manifest
 from miner_model_energy.features import (
     KNOWN_WEATHER_SUFFIXES,
-    MIN_LOAD_LAG_STEPS,
     add_engineered_features,
     add_test_load_features_from_history,
 )
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import ModelConfig, load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
-from miner_model_energy.data_io import TARGET_COLUMN_HORIZON
+from miner_model_energy.data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON
 from miner_model_energy.pipeline import (
     TrainingResult,
     _required_history_rows_for_live,
     load_training_bundle_from_manifest,
     prepare_training_data,
     persist_training_result,
+    predict_for_timestamp,
     predict_single_test_row,
     train_model,
 )
-from miner_model_energy.supabase_io import fetch_supabase_test_row, fetch_supabase_train_all
+from miner_model_energy.supabase_io import (
+    fetch_supabase_test_row,
+    fetch_supabase_train_all,
+    fetch_supabase_train_tail_before,
+)
 from miner_model_energy.storage_train_io import (
     load_train_from_storage_parts,
     storage_cache_exists,
@@ -84,7 +88,7 @@ def _default_features():
         "use_load_lags": False,
         "use_load_rolling": False,
         "use_load_delta": False,
-        "load_lag_steps": [MIN_LOAD_LAG_STEPS],
+        "load_lag_steps": [12, 24, 72],
         "rolling_load_windows": [3, 6, 12],
         # Whitelist all raw weather columns so parametrize cases match pre-filter behavior.
         "include_weather_suffix_groups": sorted(KNOWN_WEATHER_SUFFIXES),
@@ -146,11 +150,11 @@ FEATURE_COMBOS = [
     pytest.param({"use_cyclical_features": True}, id="cyclical"),
     pytest.param({"use_station_agg_features": True}, id="station_agg"),
     pytest.param({"use_temp_dew_gap": True}, id="temp_dew_gap"),
-    pytest.param({"use_load_lags": True, "load_lag_steps": [72, 84]}, id="lags"),
+    pytest.param({"use_load_lags": True, "load_lag_steps": [12, 24, 72]}, id="lags"),
     pytest.param({"use_load_delta": True}, id="delta_only"),
     pytest.param({"use_load_rolling": True, "rolling_load_windows": [3, 6, 12]}, id="rolling"),
     pytest.param(
-        {"use_load_lags": True, "use_load_rolling": True, "load_lag_steps": [72, 84]},
+        {"use_load_lags": True, "use_load_rolling": True, "load_lag_steps": [12, 24, 72]},
         id="lags_and_rolling",
     ),
     pytest.param(
@@ -366,15 +370,28 @@ def test_load_config_rejects_unknown_weather_suffix(tmp_path):
         load_model_config(str(path))
 
 
-def test_load_config_rejects_unsafe_load_lag(tmp_path):
+def test_load_config_allows_issue_time_load_lags_below_horizon(tmp_path):
     train_path, test_path = _write_dataset(tmp_path)
     cfg_path = _write_config(
         tmp_path,
         train_path,
         test_path,
-        {"use_load_lags": True, "load_lag_steps": [24]},
+        {"use_load_lags": True, "load_lag_steps": [12, 24, 72]},
     )
-    with pytest.raises(ValueError, match="unsafe load lag"):
+    cfg = load_model_config(str(cfg_path))
+    assert cfg.features["load_lag_steps"] == [12, 24, 72]
+
+
+@pytest.mark.parametrize("bad_lag", [0, -1])
+def test_load_config_rejects_non_positive_load_lag(tmp_path, bad_lag):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"use_load_lags": True, "load_lag_steps": [bad_lag]},
+    )
+    with pytest.raises(ValueError, match="invalid lag"):
         load_model_config(str(cfg_path))
 
 
@@ -404,7 +421,7 @@ def test_forecast_horizon_360_creates_72_row_target_shift(tmp_path):
     assert manifest["horizon_steps"] == 72
 
 
-def test_rolling_delta_features_shift_by_min_safe_lag():
+def test_rolling_delta_features_use_only_completed_issue_time_loads():
     frame = pd.DataFrame(
         {
             "dt": pd.date_range("2025-01-01", periods=120, freq="5min"),
@@ -421,14 +438,14 @@ def test_rolling_delta_features_shift_by_min_safe_lag():
         },
     )
 
-    assert out["load_roll_mean_3"].iloc[100] == pytest.approx((26.0 + 27.0 + 28.0) / 3.0)
-    assert out["load_roll_max_3"].iloc[100] == pytest.approx(28.0)
+    assert out["load_roll_mean_3"].iloc[100] == pytest.approx((97.0 + 98.0 + 99.0) / 3.0)
+    assert out["load_roll_max_3"].iloc[100] == pytest.approx(99.0)
     assert out["load_delta_1"].iloc[100] == pytest.approx(1.0)
     assert out["load_delta_3"].iloc[100] == pytest.approx(3.0)
     assert out["load_delta_12"].iloc[100] == pytest.approx(12.0)
 
 
-def test_test_load_features_from_history_use_min_safe_lag():
+def test_test_load_features_from_history_use_issue_time_past_loads():
     train = pd.DataFrame(
         {
             "dt": pd.date_range("2025-01-01", periods=100, freq="5min"),
@@ -441,16 +458,18 @@ def test_test_load_features_from_history_use_min_safe_lag():
         train,
         {
             "use_load_lags": True,
-            "load_lag_steps": [72],
+            "load_lag_steps": [12, 24, 72],
             "use_load_rolling": True,
             "rolling_load_windows": [3],
             "use_load_delta": True,
         },
     )
 
+    assert out["load_lag_12"].iloc[0] == pytest.approx(88.0)
+    assert out["load_lag_24"].iloc[0] == pytest.approx(76.0)
     assert out["load_lag_72"].iloc[0] == pytest.approx(28.0)
-    assert out["load_roll_mean_3"].iloc[0] == pytest.approx((26.0 + 27.0 + 28.0) / 3.0)
-    assert out["load_roll_max_3"].iloc[0] == pytest.approx(28.0)
+    assert out["load_roll_mean_3"].iloc[0] == pytest.approx((97.0 + 98.0 + 99.0) / 3.0)
+    assert out["load_roll_max_3"].iloc[0] == pytest.approx(99.0)
     assert out["load_delta_1"].iloc[0] == pytest.approx(1.0)
     assert out["load_delta_3"].iloc[0] == pytest.approx(3.0)
     assert out["load_delta_12"].iloc[0] == pytest.approx(12.0)
@@ -555,6 +574,10 @@ class _FakeQuery:
         self._predicates.append(("lte", key, value))
         return self
 
+    def lt(self, key, value):
+        self._predicates.append(("lt", key, value))
+        return self
+
     def execute(self):
         rows = list(self._rows)
         for op, key, value in self._predicates:
@@ -564,6 +587,8 @@ class _FakeQuery:
                 rows = [r for r in rows if str(r.get(key)) >= str(value)]
             elif op == "lte":
                 rows = [r for r in rows if str(r.get(key)) <= str(value)]
+            elif op == "lt":
+                rows = [r for r in rows if str(r.get(key)) < str(value)]
         rows = sorted(rows, key=lambda r: str(r.get("dt")), reverse=self._order_desc)
         if self._range is not None:
             start, end = self._range
@@ -604,6 +629,25 @@ def test_fetch_supabase_train_all_paginates_and_normalizes():
     assert str(frame["dt"].iloc[0]) == "2026-04-13 20:45:00"
 
 
+def test_fetch_supabase_train_tail_before_excludes_issue_time_and_newer_rows():
+    train_rows = [
+        {"dt": "2026-04-13 05:50:00", "total_load": 998.0},
+        {"dt": "2026-04-13 05:55:00", "total_load": 999.0},
+        {"dt": "2026-04-13 06:00:00", "total_load": 1000.0},
+        {"dt": "2026-04-13 06:05:00", "total_load": 1001.0},
+    ]
+    client = _FakeSupabaseClient({"train_table": train_rows})
+    frame = fetch_supabase_train_tail_before(
+        client,
+        schema="hackathon",
+        table="train_table",
+        n_rows=10,
+        before_dt="2026-04-13 06:00:00",
+    )
+    assert list(frame[TARGET_COLUMN]) == [998.0, 999.0]
+    assert frame["dt"].max() < pd.Timestamp("2026-04-13 06:00:00")
+
+
 def test_fetch_supabase_test_row_prefers_requested_horizon():
     rows = [
         {"dt": "2026-04-13 20:45:00", "horizon_min": 10, "4B8-tmpf": 50.0},
@@ -638,9 +682,6 @@ def test_fetch_supabase_test_row_falls_back_to_local_wall_clock_exact():
     assert int(row["horizon_min"]) == 5
 
 
-<<<<<<< HEAD
-def test_required_history_rows_for_live_rnn_load_lag_84_covers_sequence_window():
-=======
 def test_fetch_supabase_test_row_returns_none_on_horizon_mismatch():
     rows = [
         {"dt": "2026-04-13 20:45:00", "horizon_min": 10, "4B8-tmpf": 50.0},
@@ -657,8 +698,7 @@ def test_fetch_supabase_test_row_returns_none_on_horizon_mismatch():
     assert row is None
 
 
-def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window():
->>>>>>> upstream/main
+def test_required_history_rows_for_live_rnn_load_lags_covers_sequence_window():
     """After shift(max_lag), only tail rows are non-NaN in load_lag_*; fetch enough for RNN window."""
 
     class _Bundle:
@@ -677,14 +717,14 @@ def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window()
         data={},
         features={
             "use_load_lags": True,
-            "load_lag_steps": [72, 84],
+            "load_lag_steps": [12, 24, 72],
         },
         training={},
         models={},
         persistence={},
     )
     needed = _required_history_rows_for_live(result, cfg)
-    assert needed >= 84 + 11 + 8  # max_lag + (n_steps - 1) + live_seq_buffer
+    assert needed >= 72 + 11 + 8  # max_lag + (n_steps - 1) + live_seq_buffer
 
 
 def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail():
@@ -704,14 +744,97 @@ def test_required_history_rows_for_live_linear_with_load_lags_no_sequence_tail()
         data={},
         features={
             "use_load_lags": True,
-            "load_lag_steps": [72, 84],
+            "load_lag_steps": [12, 24, 72],
         },
         training={},
         models={},
         persistence={},
     )
     needed = _required_history_rows_for_live(result, cfg)
-    assert needed == 86
+    assert needed == 74
+
+
+def test_predict_for_timestamp_builds_load_lags_from_issue_time_history(monkeypatch):
+    target_ts = pd.Timestamp("2026-04-13 12:00:00")
+    issue_ts = target_ts - pd.Timedelta(minutes=360)
+    rows = []
+    start = pd.Timestamp("2026-04-13 00:00:00")
+    for i in range(144):
+        dt = start + pd.Timedelta(minutes=5 * i)
+        rows.append(
+            {
+                "dt": dt,
+                "Total Load": 999999.0 if dt >= issue_ts else float(i),
+            }
+        )
+    returned_history = pd.DataFrame(rows)
+    captured = {}
+
+    def _fake_fetch_tail_before(_client, schema, table, n_rows, before_dt):
+        assert schema == "hackathon"
+        assert table == "train_table"
+        assert n_rows >= 74
+        assert pd.Timestamp(before_dt) == issue_ts
+        # Return extra rows on purpose; predict_for_timestamp must still discard rows at
+        # and after issue time before constructing issue-time load lag features.
+        return returned_history.copy()
+
+    def _fake_fetch_test_row(_client, schema, table, dt_target, horizon_min, nearest_fallback_minutes):
+        assert schema == "hackathon"
+        assert table == "test_table"
+        assert pd.Timestamp(dt_target) == target_ts
+        assert horizon_min == 360
+        return {"dt": target_ts.strftime("%Y-%m-%d %H:%M:%S"), "horizon_min": 360}
+
+    def _fake_predict_linear(_bundle, X):
+        captured["X"] = X
+        return [321.0]
+
+    monkeypatch.setattr("miner_model_energy.pipeline.create_supabase_data_client", lambda *_args: object())
+    monkeypatch.setattr("miner_model_energy.pipeline.fetch_supabase_train_tail_before", _fake_fetch_tail_before)
+    monkeypatch.setattr("miner_model_energy.pipeline.fetch_supabase_test_row", _fake_fetch_test_row)
+    monkeypatch.setattr("miner_model_energy.pipeline.predict_linear", _fake_predict_linear)
+
+    result = TrainingResult(
+        model_type="linear",
+        model_bundle=object(),
+        metrics={},
+        features=["load_lag_12", "load_lag_24", "load_lag_72"],
+        train_frame=pd.DataFrame(),
+        test_frame=pd.DataFrame(),
+        shapes={},
+    )
+    cfg = ModelConfig(
+        data={
+            "source": "supabase",
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "train_table",
+            "supabase_test_table": "test_table",
+            "forecast_horizon_min": 360,
+            "supabase_page_size": 1000,
+        },
+        features={
+            "use_load_lags": True,
+            "load_lag_steps": [12, 24, 72],
+            "use_load_rolling": False,
+            "use_load_delta": False,
+            "include_weather_suffix_groups": [],
+        },
+        training={},
+        models={},
+        persistence={},
+    )
+
+    pred = predict_for_timestamp(result, cfg, target_ts.strftime("%Y-%m-%d %H:%M:%S"))
+    assert pred == pytest.approx(321.0)
+
+    safe_history = returned_history[returned_history["dt"] < issue_ts].reset_index(drop=True)
+    assert captured["X"][0, 0] == pytest.approx(float(safe_history[TARGET_COLUMN].iloc[-12]))
+    assert captured["X"][0, 1] == pytest.approx(float(safe_history[TARGET_COLUMN].iloc[-24]))
+    assert captured["X"][0, 2] == pytest.approx(float(safe_history[TARGET_COLUMN].iloc[-72]))
+    assert 999999.0 not in captured["X"]
 
 
 def test_prepare_training_data_csv_has_no_horizon_target_by_default(tmp_path):
@@ -1033,6 +1156,8 @@ def test_run_preflight_returns_exit_mode(monkeypatch):
 
 
 def test_run_preflight_deploy_yes_prompts_dataset_dump_and_passes_flag(monkeypatch):
+    if miner_module is None:
+        pytest.skip("bittensor is not installed; skipping full miner preflight import test.")
     cfg = ModelConfig(data={"source": "csv"}, features={}, training={}, models={}, persistence={})
     fake_result = object()
     captured = {}
@@ -1068,6 +1193,8 @@ def test_run_preflight_deploy_yes_prompts_dataset_dump_and_passes_flag(monkeypat
 
 
 def test_run_preflight_deploy_no_skips_dataset_dump_prompt(monkeypatch):
+    if miner_module is None:
+        pytest.skip("bittensor is not installed; skipping full miner preflight import test.")
     cfg = ModelConfig(data={"source": "csv"}, features={}, training={}, models={}, persistence={})
     fake_result = object()
     prompts: list[str] = []

@@ -51,8 +51,9 @@ from .supabase_io import (
     create_supabase_data_client,
     fetch_supabase_test_row,
     fetch_supabase_train_all,
-    fetch_supabase_train_tail,
+    fetch_supabase_train_tail_before,
     normalize_supabase_test_frame,
+    parse_timestamp_for_supabase,
 )
 from .storage_train_io import load_train_from_storage_parts
 
@@ -580,7 +581,15 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
     try:
         client = create_supabase_data_client(data_cfg["supabase_url"], data_cfg["supabase_key"])
         needed_rows = _required_history_rows_for_live(result, config)
-        history = fetch_supabase_train_tail(client, schema=schema, table=train_table, n_rows=needed_rows)
+        target_ts = parse_timestamp_for_supabase(timestamp_str)
+        issue_ts = target_ts - pd.Timedelta(minutes=horizon)
+        history = fetch_supabase_train_tail_before(
+            client,
+            schema=schema,
+            table=train_table,
+            n_rows=needed_rows,
+            before_dt=issue_ts,
+        )
         forecast_row = fetch_supabase_test_row(
             client,
             schema=schema,
@@ -601,9 +610,16 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
             "Supabase live inference found no forecast row "
             f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
         )
+    history = history[history[TIMESTAMP_COLUMN] < issue_ts].copy()
+    if history.empty:
+        raise ValueError(
+            "Supabase live inference found no training history older than issue time "
+            f"{issue_ts} for target timestamp {timestamp_str}."
+        )
     bt.logging.info(
         "[LIVE_ROW] "
         f"requested_timestamp={timestamp_str} "
+        f"issue_timestamp={issue_ts} "
         f"requested_horizon_min={horizon} "
         f"selected_dt={forecast_row.get(TIMESTAMP_COLUMN)} "
         f"selected_horizon_min={forecast_row.get('horizon_min')}"
