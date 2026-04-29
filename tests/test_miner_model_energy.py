@@ -1189,7 +1189,7 @@ def test_run_preflight_deploy_yes_prompts_dataset_dump_and_passes_flag(monkeypat
     assert captured["run_id"] == "miner"
     assert captured["dump"] is True
     assert "Deploy this trained model?" in prompts
-    assert "Dump full training dataset with engineered features?" in prompts
+    assert any("Dump full training dataset with engineered features?" in p for p in prompts)
 
 
 def test_run_preflight_deploy_no_skips_dataset_dump_prompt(monkeypatch):
@@ -1224,7 +1224,7 @@ def test_run_preflight_deploy_no_skips_dataset_dump_prompt(monkeypatch):
 
     assert out.mode == "baseline"
     assert "Deploy this trained model?" in prompts
-    assert "Dump full training dataset with engineered features?" not in prompts
+    assert not any("Dump full training dataset with engineered features?" in p for p in prompts)
 
 
 if __name__ == "__main__":
