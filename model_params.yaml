@@ -1,4 +1,5 @@
 # Defaults are OFF, so experiment and enable combinations deliberately
+# Experiment 002: CART with weather and lags [12, 24, 72, 144, 288].
 # Keep track of your experiments to see what affects performance to find the sweet spot.
 # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
 # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
@@ -12,10 +13,10 @@ features:
   # tmpf = air temperature (°F), dwpf = dewpoint, relh = relative humidity,
   # sped = wind speed, drct = wind direction (degrees).
   # To use every group: [tmpf, dwpf, relh, sped, drct]
-  include_weather_suffix_groups: []
+  include_weather_suffix_groups: [tmpf, dwpf, relh, sped, drct]
 
   # hour + minute-of-day sine/cosine encodings
-  use_cyclical_features: false
+  use_cyclical_features: true
   
   # Per-station temperature / humidity / wind-speed aggregates (mean, std, min/max where applicable)
   # Add this if you want to use the temperature and humidity data to predict the load.
@@ -26,7 +27,7 @@ features:
 
   # Past Total Load columns load_lag_<k>.
   # k is relative to prediction issue time t, not target time t+6h; k=12 is one hour back on 5-min data.
-  use_load_lags: false
+  use_load_lags: true
 
   # Shifted rolling stats on load + load_delta_1/3/12 (notebook-style; exclusive with standalone deltas below).
   use_load_rolling: false
