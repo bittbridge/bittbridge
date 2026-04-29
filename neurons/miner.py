@@ -260,10 +260,23 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
 
             _print_ml_report(selected_model, result)
 
-            paths = persist_training_result(result, cfg, run_id="miner")
+            deploy_selected = _ask_yes_no_preflight("Deploy this trained model?", default_yes=False)
+            dump_full_dataset = False
+            if deploy_selected:
+                dump_full_dataset = _ask_yes_no_preflight(
+                    "Dump full training dataset with engineered features? (This may take a ~1-2 minutes)",
+                    default_yes=False,
+                )
+
+            paths = persist_training_result(
+                result,
+                cfg,
+                run_id="miner",
+                dump_full_training_dataset=dump_full_dataset,
+            )
             _sub(f"Saved artifacts: {paths['artifact_dir']}")
 
-            if _ask_yes_no_preflight("Deploy this trained model?", default_yes=False):
+            if deploy_selected:
                 _section("Ready")
                 _sub(f"Deployed advanced model: {selected_model}")
                 print()

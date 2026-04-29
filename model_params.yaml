@@ -84,6 +84,7 @@ models:
 
 # Artifacts are written under this directory next to model_params.yaml (relative paths resolve to the YAML folder).
 # Training saves a timestamped run on every successful train; save_on_deploy is legacy (no longer gates saving).
+# During interactive miner preflight, deploy=yes additionally asks whether to dump the full engineered training dataset.
 persistence:
   artifact_dir: artifacts
   save_on_deploy: true

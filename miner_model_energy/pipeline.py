@@ -666,7 +666,12 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
     return float(pred)
 
 
-def persist_training_result(result: TrainingResult, config: ModelConfig, run_id: str | None = None) -> Dict[str, str]:
+def persist_training_result(
+    result: TrainingResult,
+    config: ModelConfig,
+    run_id: str | None = None,
+    dump_full_training_dataset: bool = False,
+) -> Dict[str, str]:
     artifact_root = config.persistence["artifact_dir"]
     out_dir = prepare_artifact_dir(artifact_root, result.model_type, run_id=run_id)
 
@@ -691,6 +696,13 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
     avp_path = out_dir / ACTUAL_VS_PREDICTED_CSV
     avp_df.to_csv(avp_path, index=False)
 
+    full_train_dataset_rel: str | None = None
+    full_train_dataset_columns: List[str] | None = None
+    if dump_full_training_dataset:
+        full_train_dataset_rel = "training_dataset_full.csv"
+        full_train_dataset_columns = [str(c) for c in result.train_frame.columns.tolist()]
+        result.train_frame.to_csv(out_dir / full_train_dataset_rel, index=False)
+
     cfg_snapshot = {
         "data": config.data,
         "features": config.features,
@@ -713,6 +725,13 @@ def persist_training_result(result: TrainingResult, config: ModelConfig, run_id:
         "train_rows": int(len(result.train_frame)),
         "metrics": result.metrics,
         "durations_sec": result.durations_sec,
+        "full_training_dataset_dumped": bool(dump_full_training_dataset),
+        "full_training_dataset_path": full_train_dataset_rel,
+        "full_training_dataset_rows": int(len(result.train_frame)) if dump_full_training_dataset else None,
+        "full_training_dataset_columns_count": (
+            int(len(full_train_dataset_columns)) if full_train_dataset_columns is not None else None
+        ),
+        "full_training_dataset_columns": full_train_dataset_columns,
         "lstm_n_steps": getattr(result.model_bundle, "n_steps", None)
         if result.model_type == "lstm"
         else None,

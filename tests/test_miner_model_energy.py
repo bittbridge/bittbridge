@@ -207,9 +207,42 @@ def test_linear_training_and_persistence(tmp_path):
     manifest = load_manifest(saved["manifest_path"])
     assert manifest["model_type"] == "linear"
     assert manifest.get("actual_vs_predicted_path") == "actual_vs_predicted.csv"
+    assert manifest.get("full_training_dataset_dumped") is False
+    assert manifest.get("full_training_dataset_path") is None
     avp = Path(saved["artifact_dir"]) / "actual_vs_predicted.csv"
     assert avp.is_file()
     assert len(pd.read_csv(avp)) > 0
+
+
+def test_linear_training_and_persistence_with_full_dataset_dump(tmp_path):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {"use_load_lags": True, "use_load_delta": True},
+    )
+    cfg = load_model_config(str(cfg_path))
+    result = train_model("linear", cfg)
+
+    saved = persist_training_result(
+        result,
+        cfg,
+        run_id="pytest_full_dump",
+        dump_full_training_dataset=True,
+    )
+    artifact_dir = Path(saved["artifact_dir"])
+    manifest = load_manifest(saved["manifest_path"])
+    dumped_path = artifact_dir / "training_dataset_full.csv"
+    dumped_df = pd.read_csv(dumped_path)
+
+    assert dumped_path.is_file()
+    assert manifest.get("full_training_dataset_dumped") is True
+    assert manifest.get("full_training_dataset_path") == "training_dataset_full.csv"
+    assert manifest.get("full_training_dataset_rows") == len(result.train_frame)
+    assert manifest.get("full_training_dataset_columns_count") == len(result.train_frame.columns)
+    assert manifest.get("full_training_dataset_columns") == [str(c) for c in result.train_frame.columns]
+    assert len(dumped_df) == len(result.train_frame)
 
 
 def test_relative_artifact_dir_resolves_next_to_config_file(tmp_path):
@@ -605,7 +638,27 @@ def test_fetch_supabase_test_row_falls_back_to_local_wall_clock_exact():
     assert int(row["horizon_min"]) == 5
 
 
+<<<<<<< HEAD
 def test_required_history_rows_for_live_rnn_load_lag_84_covers_sequence_window():
+=======
+def test_fetch_supabase_test_row_returns_none_on_horizon_mismatch():
+    rows = [
+        {"dt": "2026-04-13 20:45:00", "horizon_min": 10, "4B8-tmpf": 50.0},
+        {"dt": "2026-04-13 20:45:00", "horizon_min": 15, "4B8-tmpf": 51.0},
+    ]
+    client = _FakeSupabaseClient({"test_table": rows})
+    row = fetch_supabase_test_row(
+        client,
+        schema="hackathon",
+        table="test_table",
+        dt_target="2026-04-13 20:45:00+00:00",
+        horizon_min=5,
+    )
+    assert row is None
+
+
+def test_required_history_rows_for_live_rnn_load_lag_24_covers_sequence_window():
+>>>>>>> upstream/main
     """After shift(max_lag), only tail rows are non-NaN in load_lag_*; fetch enough for RNN window."""
 
     class _Bundle:
@@ -977,6 +1030,74 @@ def test_run_preflight_returns_exit_mode(monkeypatch):
     monkeypatch.setattr(miner_module, "_ask_yes_no_preflight", _raise_exit)
     result = miner_module.run_preflight(model_params_path="unused.yaml", non_interactive=False)
     assert result.mode == "exit"
+
+
+def test_run_preflight_deploy_yes_prompts_dataset_dump_and_passes_flag(monkeypatch):
+    cfg = ModelConfig(data={"source": "csv"}, features={}, training={}, models={}, persistence={})
+    fake_result = object()
+    captured = {}
+    prompts: list[str] = []
+    yes_no_answers = iter([False, True, True])
+
+    def _fake_yes_no(prompt: str, default_yes: bool):
+        prompts.append(prompt)
+        return next(yes_no_answers)
+
+    def _fake_persist(result, _cfg, run_id=None, dump_full_training_dataset=False):
+        captured["result"] = result
+        captured["run_id"] = run_id
+        captured["dump"] = dump_full_training_dataset
+        return {"artifact_dir": "fake_artifacts", "manifest_path": "fake_manifest", "model_path": "fake_model"}
+
+    monkeypatch.setattr(miner_module, "_ask_yes_no_preflight", _fake_yes_no)
+    monkeypatch.setattr(miner_module, "_ask_model_type_preflight", lambda: "linear")
+    monkeypatch.setattr(miner_module, "_print_ml_report", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(miner_module, "load_model_config", lambda _path: cfg)
+    monkeypatch.setattr(miner_module, "train_model", lambda _model, _cfg: fake_result)
+    monkeypatch.setattr(miner_module, "persist_training_result", _fake_persist)
+
+    out = miner_module.run_preflight(model_params_path="unused.yaml", non_interactive=False)
+
+    assert out.mode == "advanced:linear"
+    assert out.training_result is fake_result
+    assert captured["result"] is fake_result
+    assert captured["run_id"] == "miner"
+    assert captured["dump"] is True
+    assert "Deploy this trained model?" in prompts
+    assert "Dump full training dataset with engineered features?" in prompts
+
+
+def test_run_preflight_deploy_no_skips_dataset_dump_prompt(monkeypatch):
+    cfg = ModelConfig(data={"source": "csv"}, features={}, training={}, models={}, persistence={})
+    fake_result = object()
+    prompts: list[str] = []
+    yes_no_answers = iter([False, False])
+
+    def _fake_yes_no(prompt: str, default_yes: bool):
+        prompts.append(prompt)
+        return next(yes_no_answers)
+
+    monkeypatch.setattr(miner_module, "_ask_yes_no_preflight", _fake_yes_no)
+    monkeypatch.setattr(miner_module, "_ask_model_type_preflight", lambda: "linear")
+    monkeypatch.setattr(miner_module, "_print_ml_report", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(miner_module, "load_model_config", lambda _path: cfg)
+    monkeypatch.setattr(miner_module, "train_model", lambda _model, _cfg: fake_result)
+    monkeypatch.setattr(
+        miner_module,
+        "persist_training_result",
+        lambda *_args, **_kwargs: {
+            "artifact_dir": "fake_artifacts",
+            "manifest_path": "fake_manifest",
+            "model_path": "fake_model",
+        },
+    )
+    monkeypatch.setattr(miner_module, "_ask_after_deploy_decline", lambda: "baseline")
+
+    out = miner_module.run_preflight(model_params_path="unused.yaml", non_interactive=False)
+
+    assert out.mode == "baseline"
+    assert "Deploy this trained model?" in prompts
+    assert "Dump full training dataset with engineered features?" not in prompts
 
 
 if __name__ == "__main__":
