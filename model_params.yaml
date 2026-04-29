@@ -1,5 +1,5 @@
 # Defaults are OFF, so experiment and enable combinations deliberately
-# Experiment 002: CART with weather and lags [12, 24, 72, 144, 288].
+# Experiment 004: CART with lags and rolling stats.
 # Keep track of your experiments to see what affects performance to find the sweet spot.
 # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
 # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
@@ -30,12 +30,12 @@ features:
   use_load_lags: true
 
   # Shifted rolling stats on load + load_delta_1/3/12 (notebook-style; exclusive with standalone deltas below).
-  use_load_rolling: false
+  use_load_rolling: true
 
   # Standalone load_delta_1 and load_delta_12 when use_load_rolling is false.
   use_load_delta: false
   load_lag_steps: [12, 24, 72, 144, 288]
-  rolling_load_windows: [3, 6]
+  rolling_load_windows: [12, 24, 72]
 
 # validation_split: last fraction of time-ordered train used for metrics; random_state seeds CART / RNN / LSTM.
 # show_training_progress: phased [train] logs + timings; linear/cart have no intra-fit bar (sklearn).
