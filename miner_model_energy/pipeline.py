@@ -43,8 +43,10 @@ from .features import (
 from .ml_config import ModelConfig
 from .models_cart import predict_cart, save_cart, train_cart
 from .models_cart import load_cart
+from .models_hgb import load_hgb, predict_hgb, save_hgb, train_hgb
 from .models_linear import LinearBundle, load_linear, predict_linear, save_linear, train_linear
 from .models_lstm import LSTM_SCALER_FILENAME, load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
+from .models_rf import load_rf, predict_rf, save_rf, train_rf
 from .models_rnn import RNN_SCALER_FILENAME, load_rnn, predict_rnn, save_rnn, train_rnn
 from .split import temporal_train_val_split
 from .supabase_io import (
@@ -376,6 +378,18 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         bundle = train_cart(X_train, y_train, features, cart_cfg)
         train_pred = predict_cart(bundle, X_train)
         val_pred = predict_cart(bundle, X_val)
+    elif model_type == "rf":
+        rf_cfg = dict(config.models.get("rf", {}))
+        rf_cfg.setdefault("random_state", rs)
+        bundle = train_rf(X_train, y_train, features, rf_cfg)
+        train_pred = predict_rf(bundle, X_train)
+        val_pred = predict_rf(bundle, X_val)
+    elif model_type == "hgb":
+        hgb_cfg = dict(config.models.get("hgb", {}))
+        hgb_cfg.setdefault("random_state", rs)
+        bundle = train_hgb(X_train, y_train, features, hgb_cfg)
+        train_pred = predict_hgb(bundle, X_train)
+        val_pred = predict_hgb(bundle, X_val)
     elif model_type == "lstm":
         bundle = train_lstm(
             X_train,
@@ -506,6 +520,10 @@ def predict_single_test_row(result: TrainingResult) -> float:
         pred = predict_linear(result.model_bundle, X_test)[0]
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, X_test)[0]
+    elif result.model_type == "rf":
+        pred = predict_rf(result.model_bundle, X_test)[0]
+    elif result.model_type == "hgb":
+        pred = predict_hgb(result.model_bundle, X_test)[0]
     elif result.model_type == "lstm":
         seq_2d = build_sequence_inference_matrix(result)
         pred = predict_lstm(result.model_bundle, seq_2d)[0]
@@ -659,6 +677,10 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
         pred = predict_linear(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
+    elif result.model_type == "rf":
+        pred = predict_rf(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
+    elif result.model_type == "hgb":
+        pred = predict_hgb(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
     elif result.model_type == "lstm":
         n_steps = int(getattr(result.model_bundle, "n_steps", 12))
         seq = _build_live_sequence_matrix(
@@ -698,6 +720,12 @@ def persist_training_result(
     elif result.model_type == "cart":
         model_rel = "model_cart.joblib"
         save_cart(result.model_bundle, str(out_dir / model_rel))
+    elif result.model_type == "rf":
+        model_rel = "model_rf.joblib"
+        save_rf(result.model_bundle, str(out_dir / model_rel))
+    elif result.model_type == "hgb":
+        model_rel = "model_hgb.joblib"
+        save_hgb(result.model_bundle, str(out_dir / model_rel))
     elif result.model_type == "lstm":
         model_rel = "model_lstm.keras"
         save_lstm(result.model_bundle, str(out_dir / model_rel))
@@ -786,6 +814,10 @@ def load_training_bundle_from_manifest(manifest_path: str):
         return load_linear(model_path)
     if model_type == "cart":
         return load_cart(model_path)
+    if model_type == "rf":
+        return load_rf(model_path)
+    if model_type == "hgb":
+        return load_hgb(model_path)
     if model_type == "lstm":
         n_steps_lstm = int(manifest.get("lstm_n_steps", 12))
         scaler_path: str | None = None

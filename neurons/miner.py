@@ -149,14 +149,14 @@ def _ask_yes_no_preflight(prompt: str, default_yes: bool) -> bool:
 
 def _ask_model_type_preflight() -> str:
     try:
-        answer = input("  Select model (linear / cart / rnn / lstm / [3] exit): ").strip().lower()
+        answer = input("  Select model (linear / cart / rf / hgb / rnn / lstm / [3] exit): ").strip().lower()
     except EOFError:
         return "linear"
     if not answer:
         return "linear"
     if answer in {"3", "exit", "quit", "q"}:
         raise PreflightExitRequested()
-    if answer not in {"linear", "cart", "rnn", "lstm"}:
+    if answer not in {"linear", "cart", "rf", "hgb", "rnn", "lstm"}:
         print("  Unknown choice; defaulting to linear.")
         return "linear"
     return answer
@@ -171,7 +171,7 @@ def _ask_after_deploy_decline() -> str:
     """
     _section("Deploy declined — what next?")
     _sub("  [1]  Continue with baseline moving-average model")
-    _sub("  [2]  Train another advanced model (linear / cart / rnn / lstm)")
+    _sub("  [2]  Train another advanced model (linear / cart / rf / hgb / rnn / lstm)")
     _sub("  [3]  Exit miner")
     print()
     while True:

@@ -119,6 +119,20 @@ def _write_config(
         "models": {
             "linear": {"fit_intercept": True},
             "cart": {"max_depth": 4, "min_samples_split": 4, "min_samples_leaf": 2},
+            "rf": {
+                "n_estimators": 10,
+                "max_depth": 6,
+                "min_samples_leaf": 2,
+                "random_state": 123,
+                "n_jobs": 1,
+            },
+            "hgb": {
+                "max_iter": 20,
+                "learning_rate": 0.05,
+                "max_leaf_nodes": 15,
+                "l2_regularization": 0.01,
+                "random_state": 123,
+            },
             "lstm": {
                 "n_steps": 12,
                 "units": 8,
@@ -295,6 +309,35 @@ def test_cart_training(tmp_path):
     cfg = load_model_config(str(cfg_path))
     result = train_model("cart", cfg)
     assert result.metrics["validation"]["mae"] >= 0.0
+
+
+@pytest.mark.parametrize("model_type", ["rf", "hgb"])
+def test_sklearn_tree_ensemble_training_persistence_and_reload(tmp_path, model_type):
+    train_path, test_path = _write_dataset(tmp_path)
+    cfg_path = _write_config(
+        tmp_path,
+        train_path,
+        test_path,
+        {
+            "use_time_features": True,
+            "use_cyclical_features": True,
+            "use_load_lags": True,
+            "use_load_rolling": True,
+            "rolling_load_windows": [12, 24, 72],
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+    result = train_model(model_type, cfg)
+    assert result.metrics["validation"]["rmse"] >= 0.0
+    pred = predict_single_test_row(result)
+    assert isinstance(pred, float)
+
+    saved = persist_training_result(result, cfg, run_id=f"pytest_{model_type}")
+    manifest = load_manifest(saved["manifest_path"])
+    assert manifest["model_type"] == model_type
+    assert Path(saved["model_path"]).name == f"model_{model_type}.joblib"
+    reloaded = load_training_bundle_from_manifest(saved["manifest_path"])
+    assert reloaded.features == result.features
 
 
 def test_predictor_router_switch(tmp_path):
