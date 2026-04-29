@@ -10,5 +10,5 @@ Goal: find the model with the lowest validation MAPE and stable live deployment.
 | 003 | linear | same as Exp 002 | 1106.155 | 1417.301 | 8.363% | 0.6319 | close, but worse MAPE than CART |
 | 003 | cart | same as Exp 002 | 1118.909 | 1417.825 | 8.200% | 0.6316 | current best by MAPE |
 | 004 | cart | lags 12/24/72/144/288 + rolling 12/24/72 | 973.875 | 1246.259 | 7.275% | 0.7154 | new best |
-| 005 | rf/hgb | best features | | | | | likely champion candidate |
+| 005 | rf | lags 12/24/72/144/288 + rolling 12/24/72 | 712.334 | 951.109 | 5.383% | 0.8342 | current champion candidate |
 | 006 | rf/hgb | nonlinear weather | | | | | deploy if best |
