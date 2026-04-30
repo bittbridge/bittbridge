@@ -109,6 +109,47 @@ def _forecast_horizon_steps(train: pd.DataFrame, horizon_min: int) -> int:
     return steps
 
 
+def _weather_feature_columns(frame: pd.DataFrame) -> List[str]:
+    cols: List[str] = []
+    for col in frame.columns:
+        if not isinstance(col, str):
+            continue
+        if col in {TIMESTAMP_COLUMN, TARGET_COLUMN, TARGET_COLUMN_HORIZON}:
+            continue
+        if "-" not in col:
+            continue
+        suffix = col.rsplit("-", 1)[-1].strip().lower()
+        if suffix in KNOWN_WEATHER_SUFFIXES:
+            cols.append(col)
+    return cols
+
+
+def _apply_supabase_storage_feature_shift(
+    train: pd.DataFrame,
+    config: ModelConfig,
+    show_progress: bool,
+) -> tuple[pd.DataFrame, bool, int]:
+    source = config.data.get("source", "csv")
+    shift_min = int(config.data.get("train_feature_time_shift_min", 0))
+    if source != "supabase_storage" or shift_min <= 0:
+        return train, False, 0
+
+    steps = _forecast_horizon_steps(train, shift_min)
+    cols = _weather_feature_columns(train)
+    if not cols:
+        return train, False, 0
+
+    shifted = train.copy()
+    shifted[cols] = shifted[cols].shift(-steps)
+    if show_progress:
+        print(
+            f"  [train]     Feature shift active: source=supabase_storage, "
+            f"train_feature_time_shift_min={shift_min}, steps={steps}, shifted_cols={len(cols)}",
+            flush=True,
+        )
+    return shifted, True, steps
+
+
 def _fmt_sec(seconds: float) -> str:
     if seconds < 60:
         return f"{seconds:.1f}s"
@@ -266,6 +307,10 @@ def prepare_training_data(
             f"  [train]     Supabase data pulled: train_shape={train.shape}, test_shape={test.shape}",
             flush=True,
         )
+    train, feature_shift_active, feature_shift_steps = _apply_supabase_storage_feature_shift(
+        train, config, show_progress=show_progress
+    )
+
     suffix_whitelist = config.features.get("include_weather_suffix_groups")
     train = filter_weather_suffix_columns(train, suffix_whitelist)
     test = filter_weather_suffix_columns(test, suffix_whitelist)
@@ -301,18 +346,30 @@ def prepare_training_data(
             "produce the same columns. Check model_params.yaml toggles and CSV schemas."
         )
     horizon_min = int(config.data.get("forecast_horizon_min", 0))
-    steps = _forecast_horizon_steps(train, horizon_min)
-    if steps > 0:
-        train[TARGET_COLUMN_HORIZON] = train[TARGET_COLUMN].shift(-steps)
+    disable_horizon_label_shift = bool(
+        config.data.get("train_disable_horizon_label_shift_when_feature_shifted", False)
+    )
+    steps = 0
+    if feature_shift_active and disable_horizon_label_shift:
         if show_progress:
-            median_m = float(
-                train[TIMESTAMP_COLUMN].diff().dt.total_seconds().div(60.0).median(skipna=True)
-            )
             print(
                 f"  [train]     Horizon target: forecast_horizon_min={horizon_min}, "
                 f"median_dt_min={median_m:.4f}, steps={steps} -> `{TARGET_COLUMN_HORIZON}`",
                 flush=True,
             )
+    else:
+        steps = _forecast_horizon_steps(train, horizon_min)
+        if steps > 0:
+            train[TARGET_COLUMN_HORIZON] = train[TARGET_COLUMN].shift(-steps)
+            if show_progress:
+                median_m = float(
+                    train[TIMESTAMP_COLUMN].diff().dt.total_seconds().div(60.0).median(skipna=True)
+                )
+                print(
+                    f"  [train]     Horizon target: forecast_horizon_min={horizon_min}, "
+                    f"median_dt_min={median_m:.4f}, steps={steps} → `{TARGET_COLUMN_HORIZON}`",
+                    flush=True,
+                )
 
     required_train_cols = features + [TARGET_COLUMN]
     if steps > 0:
@@ -351,6 +408,8 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         train_model, validation_split=config.training["validation_split"]
     )
     y_col = TARGET_COLUMN_HORIZON if TARGET_COLUMN_HORIZON in train_model.columns else TARGET_COLUMN
+    if show_progress:
+        print(f"  [train]     Target column selected: `{y_col}`", flush=True)
     X_train = _as_numpy(train_split, features)
     y_train = train_split[y_col].to_numpy()
     X_val = _as_numpy(val_split, features)
@@ -515,6 +574,11 @@ def build_lstm_inference_matrix(result: TrainingResult) -> np.ndarray:
 
 
 def predict_single_test_row(result: TrainingResult) -> float:
+    pred, _ = predict_single_test_row_with_context(result)
+    return pred
+
+
+def predict_single_test_row_with_context(result: TrainingResult) -> tuple[float, Dict[str, Any]]:
     X_test = result.test_frame[result.features].astype(float).to_numpy()
     if result.model_type == "linear":
         pred = predict_linear(result.model_bundle, X_test)[0]
@@ -532,7 +596,17 @@ def predict_single_test_row(result: TrainingResult) -> float:
         pred = predict_rnn(result.model_bundle, seq_2d)[0]
     else:
         raise ValueError(f"Unsupported model type: {result.model_type}")
-    return float(pred)
+    input_row = (
+        result.test_frame[result.features].iloc[0].to_dict()
+        if not result.test_frame.empty
+        else {}
+    )
+    context: Dict[str, Any] = {
+        "source": "local_test_frame",
+        "model_type": result.model_type,
+        "model_input_row": input_row,
+    }
+    return float(pred), context
 
 
 def _required_history_rows_for_live(result: TrainingResult, config: ModelConfig) -> int:
@@ -585,9 +659,16 @@ def _build_live_sequence_matrix(
 
 
 def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp_str: str) -> float:
+    pred, _ = predict_for_timestamp_with_context(result, config, timestamp_str)
+    return pred
+
+
+def predict_for_timestamp_with_context(
+    result: TrainingResult, config: ModelConfig, timestamp_str: str
+) -> tuple[float, Dict[str, Any]]:
     source = config.data.get("source", "csv")
     if source not in {"supabase", "supabase_storage"}:
-        return predict_single_test_row(result)
+        return predict_single_test_row_with_context(result)
 
     data_cfg = config.data
     schema = data_cfg["supabase_schema"]
@@ -701,7 +782,22 @@ def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp
         pred = predict_rnn(result.model_bundle, seq)[0]
     else:
         raise ValueError(f"Unsupported model type: {result.model_type}")
-    return float(pred)
+
+    model_input_row = (
+        test_features[result.features].iloc[0].to_dict()
+        if not test_features.empty
+        else {}
+    )
+    latest_train_row = history.iloc[-1].to_dict() if not history.empty else {}
+    context: Dict[str, Any] = {
+        "source": source,
+        "model_type": result.model_type,
+        "requested_timestamp": timestamp_str,
+        "forecast_row_raw": forecast_row,
+        "train_row_latest_raw": latest_train_row,
+        "model_input_row": model_input_row,
+    }
+    return float(pred), context
 
 
 def persist_training_result(

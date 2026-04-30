@@ -1,4 +1,5 @@
 import argparse
+import json
 import random
 import time
 from dataclasses import dataclass
@@ -213,8 +214,15 @@ def run_preflight(model_params_path: str, non_interactive: bool) -> PreflightRes
         try:
             cfg = load_model_config(model_params_path)
         except Exception as exc:
-            print(f"  Failed to load model config: {exc}")
-            return PreflightResult(mode="baseline")
+            _section("Custom model config load failed")
+            _sub(f"Could not load model config from: {model_params_path}")
+            _sub(f"Reason: {exc}")
+            _sub(
+                "Please check file path/spelling for model_params.yaml and restart custom model setup."
+            )
+            _sub("Exiting miner. Please fix config and restart.")
+            print()
+            return PreflightResult(mode="exit")
 
         storage_force_refresh_decision = False
         force_refresh_used = False
@@ -336,6 +344,7 @@ class Miner(BaseMinerNeuron):
         super(Miner, self).__init__(config=config)
         self._add_test_noise = getattr(self.config, "test", False)
         self.predictor_router = PredictorRouter(BaselineMovingAveragePredictor(N_STEPS))
+        deployed_mode = "baseline"
         if preflight_result and preflight_result.training_result is not None:
             predictor = AdvancedModelPredictor(result=preflight_result.training_result)
             if preflight_result.model_config and preflight_result.model_config.data.get("source") in {
@@ -351,12 +360,27 @@ class Miner(BaseMinerNeuron):
                 mode=preflight_result.mode,
             )
             bt.logging.success(f"Using preflight-deployed model mode: {preflight_result.mode}")
+            deployed_mode = preflight_result.mode
+        elif preflight_result and preflight_result.mode:
+            deployed_mode = preflight_result.mode
+
+        bt.logging.success(
+            f"Miner deployed and ready to answer validator requests. Active model mode: {deployed_mode}"
+        )
 
     async def forward(self, synapse: bittbridge.protocol.Challenge) -> bittbridge.protocol.Challenge:
         """
         Responds to the Challenge synapse from the validator with a LoadMw point prediction
         (moving average of recent 5-min system load).
         """
+        caller_hotkey = None
+        if synapse.dendrite is not None:
+            caller_hotkey = synapse.dendrite.hotkey
+        bt.logging.info(
+            f"Received validator prediction request: hotkey={caller_hotkey}, "
+            f"timestamp={synapse.timestamp}, model_mode={self.predictor_router.mode}"
+        )
+
         prediction = self.predictor_router.predict(synapse.timestamp)
         if prediction is None:
             return synapse
@@ -378,6 +402,14 @@ class Miner(BaseMinerNeuron):
             bt.logging.success(
                 f"[{self.predictor_router.mode}] Predicting LoadMw for timestamp={synapse.timestamp}: {prediction:.1f}"
             )
+        bt.logging.success(
+            f"Prediction request input: hotkey={caller_hotkey}, timestamp={synapse.timestamp}, "
+            f"model_mode={self.predictor_router.mode}, prediction={prediction:.1f}"
+        )
+        bt.logging.success(
+            "Prediction model input context: "
+            + json.dumps(self.predictor_router.last_prediction_context, default=str, ensure_ascii=True)
+        )
         return synapse
 
     async def blacklist(self, synapse: bittbridge.protocol.Challenge) -> typing.Tuple[bool, str]:

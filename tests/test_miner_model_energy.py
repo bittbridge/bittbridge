@@ -886,7 +886,53 @@ def test_prepare_training_data_csv_has_no_horizon_target_by_default(tmp_path):
     cfg = load_model_config(str(cfg_path))
     train_model_frame, _, _ = prepare_training_data(cfg, show_progress=False)
     assert cfg.data["forecast_horizon_min"] == 0
+    assert cfg.data["train_feature_time_shift_min"] == 0
+    assert cfg.data["train_disable_horizon_label_shift_when_feature_shifted"] is False
     assert TARGET_COLUMN_HORIZON not in train_model_frame.columns
+
+
+def test_prepare_training_data_supabase_storage_shift_mode_keeps_current_label(tmp_path, monkeypatch):
+    train_path, test_path = _write_dataset(tmp_path)
+    train_df = pd.read_csv(train_path)
+    train_df["dt"] = pd.to_datetime(train_df["dt"], errors="raise")
+
+    def _fake_load_train_from_storage_parts(config, force_refresh):
+        assert config.data["source"] == "supabase_storage"
+        assert force_refresh is False
+        return train_df.copy()
+
+    monkeypatch.setattr(
+        "miner_model_energy.pipeline.load_train_from_storage_parts",
+        _fake_load_train_from_storage_parts,
+    )
+
+    cfg_path = _write_config(
+        tmp_path,
+        train_path=train_path,
+        test_path=test_path,
+        data_patch={
+            "source": "supabase_storage",
+            "forecast_horizon_min": 10,
+            "train_feature_time_shift_min": 10,
+            "train_disable_horizon_label_shift_when_feature_shifted": True,
+            "storage_train_base_url": "https://example.supabase.co/storage/v1/object/public/public-dumps/hackathon-train-data/",
+            "storage_train_parts": ["part-2024-01.csv"],
+            "storage_cache_dir": str(tmp_path / "cache"),
+            "storage_cache_parquet_name": "train_merged.parquet",
+            "supabase_url": "https://example.supabase.co",
+            "supabase_key": "sb_test",
+            "supabase_schema": "hackathon",
+            "supabase_train_table": "hackathon-train-data",
+            "supabase_test_table": "hackathon-test-data",
+        },
+    )
+    cfg = load_model_config(str(cfg_path))
+    train_model_frame, _, _ = prepare_training_data(cfg, show_progress=False)
+
+    assert TARGET_COLUMN_HORIZON not in train_model_frame.columns
+    assert len(train_model_frame) == len(train_df) - 2  # 10 min on 5-min cadence => 2 shifted tail rows dropped
+    assert float(train_model_frame["4B8-tmpf"].iloc[0]) == float(train_df["4B8-tmpf"].iloc[2])
+    assert float(train_model_frame[TARGET_COLUMN].iloc[0]) == float(train_df[TARGET_COLUMN].iloc[0])
 
 
 def test_prepare_training_data_uses_supabase_branch(tmp_path, monkeypatch):

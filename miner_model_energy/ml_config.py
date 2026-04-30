@@ -138,6 +138,12 @@ def load_model_config(path: str) -> ModelConfig:
     if source not in {"csv", "supabase", "supabase_storage"}:
         raise ValueError("`data.source` must be one of: csv, supabase, supabase_storage.")
     data["source"] = source
+    data["train_feature_time_shift_min"] = int(data.get("train_feature_time_shift_min", 0))
+    if data["train_feature_time_shift_min"] < 0:
+        raise ValueError("`data.train_feature_time_shift_min` must be >= 0.")
+    data["train_disable_horizon_label_shift_when_feature_shifted"] = bool(
+        data.get("train_disable_horizon_label_shift_when_feature_shifted", False)
+    )
 
     train_csv = _clean_optional_str(data.get("train_csv"))
     test_csv = _clean_optional_str(data.get("test_csv"))

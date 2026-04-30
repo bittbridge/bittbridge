@@ -122,6 +122,11 @@ data:
   supabase_test_table: hackathon-test-data
   # Minutes ahead for the challenge target; used for Supabase test-row fetch and training label shift.
   forecast_horizon_min: 360
+  # Shift weather feature columns forward in training by this many minutes.
+  # Applied only when data.source is supabase_storage.
+  train_feature_time_shift_min: 360
+  # When true and feature shift is active, keep label as current-row Total Load (skip horizon label shift).
+  train_disable_horizon_label_shift_when_feature_shifted: false
   supabase_page_size: 1000
   # Optional training cache based on your public Supabase Storage CSV dumps.
   # Set `data.source: supabase_storage` to enable.
