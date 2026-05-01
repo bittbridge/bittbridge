@@ -14,3 +14,4 @@ Goal: find the model with the lowest validation MAPE and stable live deployment.
 | 006B | hgb | same 83 features as Exp 005 | 505.320 | 657.598 | 3.784% | 0.9235 | DEPLOY - beats RF |
 | 007A/007B | hgb tuned | 800 iter / lr .025 or equivalent tuned HGB | 500.931 | 649.911 | 3.751% | 0.9252 | best candidate |
 | 007C | hgb | tuned HGB + lags 1/6/12/24/72/144/288 | 492.686 | 646.335 | 3.698% | 0.9261 | new best candidate |
+| 007D | hgb | 007C + weather aggregate nonlinear features | 500.186 | 653.611 | 3.744% | 0.9244 | worse than 007C, do not deploy |
