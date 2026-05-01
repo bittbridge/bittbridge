@@ -95,7 +95,7 @@ In Colab:
 
 1. Pin versions to match VM:
   ```python
-   !pip install -q tensorflow==2.21.0 keras==3.12.1 scikit-learn==1.7.2 pandas==2.2.2 numpy==1.26.4 joblib==1.4.2
+   !pip install -q tensorflow==2.21.0 keras==3.12.1 scikit-learn==1.7.2 pandas==2.2.2 numpy
   ```
 2. Train and save model in the same folder:
   - `model_custom.joblib` (sklearn), or
