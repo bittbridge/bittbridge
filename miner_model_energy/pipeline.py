@@ -34,6 +34,7 @@ from .artifacts import (
 )
 from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN, load_train_test
 from .features import (
+    KNOWN_WEATHER_SUFFIXES,
     MIN_LOAD_LAG_STEPS,
     add_engineered_features,
     add_test_load_features_from_history,
