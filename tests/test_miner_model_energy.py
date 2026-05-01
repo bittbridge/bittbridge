@@ -29,6 +29,7 @@ from miner_model_energy.features import (
 from miner_model_energy.inference_runtime import AdvancedModelPredictor, PredictorRouter
 from miner_model_energy.ml_config import ModelConfig, load_model_config
 from miner_model_energy.models_lstm import LSTM_SCALER_FILENAME
+from miner_model_energy.models_rf import train_rf
 from miner_model_energy.data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON
 from miner_model_energy.pipeline import (
     TrainingResult,
@@ -309,6 +310,24 @@ def test_cart_training(tmp_path):
     cfg = load_model_config(str(cfg_path))
     result = train_model("cart", cfg)
     assert result.metrics["validation"]["mae"] >= 0.0
+
+
+def test_rf_training_applies_max_features():
+    bundle = train_rf(
+        [[0.0, 0.0], [1.0, 1.0], [2.0, 0.0], [3.0, 1.0]],
+        [0.0, 1.0, 0.0, 1.0],
+        ["x0", "x1"],
+        {
+            "n_estimators": 2,
+            "max_depth": 2,
+            "min_samples_leaf": 1,
+            "max_features": 0.7,
+            "random_state": 42,
+            "n_jobs": 1,
+        },
+    )
+
+    assert bundle.model.max_features == pytest.approx(0.7)
 
 
 @pytest.mark.parametrize("model_type", ["rf", "hgb"])

@@ -19,6 +19,7 @@ def train_rf(X_train: np.ndarray, y_train: np.ndarray, features: List[str], cfg:
         n_estimators=int(cfg.get("n_estimators", 200)),
         max_depth=None if cfg.get("max_depth") is None else int(cfg.get("max_depth", 12)),
         min_samples_leaf=int(cfg.get("min_samples_leaf", 5)),
+        max_features=cfg.get("max_features", 1.0),
         random_state=int(cfg.get("random_state", 42)),
         n_jobs=int(cfg.get("n_jobs", -1)),
     )

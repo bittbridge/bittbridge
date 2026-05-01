@@ -1,5 +1,6 @@
 # Defaults are OFF, so experiment and enable combinations deliberately
 # Experiment 005: RF/HGB model options using Experiment 004 feature set.
+# Experiment 006C: RF tuned 300 trees depth 16 leaf 3 max_features 0.7.
 # Keep track of your experiments to see what affects performance to find the sweet spot.
 # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
 # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
@@ -54,9 +55,10 @@ models:
     min_samples_leaf: 5
 
   rf:
-    n_estimators: 200
-    max_depth: 12
-    min_samples_leaf: 5
+    n_estimators: 300
+    max_depth: 16
+    min_samples_leaf: 3
+    max_features: 0.7
     random_state: 42
     n_jobs: -1
 
