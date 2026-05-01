@@ -12,4 +12,4 @@ Goal: find the model with the lowest validation MAPE and stable live deployment.
 | 004 | cart | lags 12/24/72/144/288 + rolling 12/24/72 | 973.875 | 1246.259 | 7.275% | 0.7154 | new best |
 | 005 | rf | lags 12/24/72/144/288 + rolling 12/24/72 | 712.334 | 951.109 | 5.383% | 0.8342 | current champion candidate |
 | 006B | hgb | same 83 features as Exp 005 | 505.320 | 657.598 | 3.784% | 0.9235 | DEPLOY - beats RF |
-| 007A | hgb tuned | 800 iter, lr .025, leaves 31, l2 .1 | 500.931 | 649.911 | 3.751% | 0.9252 | beats live HGB slightly |
+| 007A/007B | hgb tuned | 800 iter / lr .025 or equivalent tuned HGB | 500.931 | 649.911 | 3.751% | 0.9252 | best candidate |
