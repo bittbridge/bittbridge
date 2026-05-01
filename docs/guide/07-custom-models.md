@@ -1,6 +1,28 @@
 # 07 — Custom Models (Export, Train, Deploy)
 
 This guide explains the end-to-end flow for creating and deploying a custom model.
+---
+### Important rules
+
+- You CAN experiment in Colab without stopping your miner
+- Your current miner can run while you test models
+- Only restart the miner in TMUX session when you are ready
+
+---
+
+### Feature selection
+
+- ❌ You MUST choose features in config file to create training dataset
+- ❌ You CANNOT create new features in Colab
+- ❌ You CANNOT drop columns from dataset
+- ❌ You CANNOT rename columns from dataset
+- ❌ You CANNOT switch places columns from dataset
+- ❌ DO NOT scale X_train manually in Colab
+- ❌ DO NOT modify dataset outside model
+- ✅ If needed, use scaling inside model (e.g., TensorFlow layer)
+
+Reason:
+External changes will break the deployment pipeline
 
 ---
 
@@ -17,17 +39,16 @@ The model must be a regressor and must be compatible with the feature schema in 
 
 ## IMPORTANT BEFORE YOU START
 
-Run this on the GCP VM first:
+1) Follow update and restart flow: [5. Update and restart](05-update-and-restart.md)
+
+2) Run this on the GCP VM first:
 
 ```bash
-cd ~/bittbridge
-git reset --hard
-git pull
 sudo apt update
 sudo apt install -y zip unzip
 ```
 
-Then update feature settings in `model_params.yaml` (for example `features.*` and data options) before exporting your custom plugin folder.
+3) Then you can play and update feature settings in `model_params.yaml` 
 
 ---
 
