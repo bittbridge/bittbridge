@@ -131,6 +131,25 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
             out["sped_std"] = _row_std_across_stations(out[sped_cols])
             out["sped_max"] = out[sped_cols].max(axis=1)
 
+    if feature_cfg.get("use_weather_aggregate_nonlinear_features", False):
+        if tmpf_cols:
+            out["avg_tmpf"] = out[tmpf_cols].mean(axis=1)
+            out["max_tmpf"] = out[tmpf_cols].max(axis=1)
+            out["min_tmpf"] = out[tmpf_cols].min(axis=1)
+            out["temp_spread"] = out["max_tmpf"] - out["min_tmpf"]
+            out["cooling_degree_avg"] = np.maximum(out["avg_tmpf"] - 65.0, 0.0)
+            out["heating_degree_avg"] = np.maximum(65.0 - out["avg_tmpf"], 0.0)
+            if "hour_sin" in out.columns:
+                out["avg_tmpf_x_hour_sin"] = out["avg_tmpf"] * out["hour_sin"]
+            if "hour_cos" in out.columns:
+                out["avg_tmpf_x_hour_cos"] = out["avg_tmpf"] * out["hour_cos"]
+        if dwpf_cols:
+            out["avg_dwpf"] = out[dwpf_cols].mean(axis=1)
+        if relh_cols:
+            out["avg_relh"] = out[relh_cols].mean(axis=1)
+        if sped_cols:
+            out["avg_sped"] = out[sped_cols].mean(axis=1)
+
     if feature_cfg.get("use_temp_dew_gap", False) and tmpf_cols and dwpf_cols:
         station_prefixes = sorted({c.split("-")[0] for c in tmpf_cols})
         gap_cols: List[str] = []
@@ -208,6 +227,23 @@ def _drop_features_disabled_by_config(out: pd.DataFrame, feature_cfg: Dict) -> N
             "sped_mean",
             "sped_std",
             "sped_max",
+        ):
+            if col in out.columns:
+                out.drop(columns=[col], inplace=True)
+
+    if not feature_cfg.get("use_weather_aggregate_nonlinear_features", False):
+        for col in (
+            "avg_tmpf",
+            "max_tmpf",
+            "min_tmpf",
+            "avg_dwpf",
+            "avg_relh",
+            "avg_sped",
+            "temp_spread",
+            "cooling_degree_avg",
+            "heating_degree_avg",
+            "avg_tmpf_x_hour_sin",
+            "avg_tmpf_x_hour_cos",
         ):
             if col in out.columns:
                 out.drop(columns=[col], inplace=True)

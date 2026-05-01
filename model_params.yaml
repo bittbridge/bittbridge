@@ -4,6 +4,7 @@
 # Experiment 007A: HGB tuning, 800 iter, lr .025, leaves 31, l2 .1.
 # Experiment 007B: HGB tuning, 500 iter, lr .03, leaves 63, l2 .1.
 # Experiment 007C: HGB with recent issue-time lags.
+# Experiment 007D: HGB with weather aggregate nonlinear features.
 # Keep track of your experiments to see what affects performance to find the sweet spot.
 # If the process exits with only "Killed" (no Python traceback), the OS likely ran out of RAM.
 # Lower memory use: reduce batch_size, epochs, units, dense_units, and/or n_steps; add swap; use a larger VM
@@ -25,6 +26,9 @@ features:
   # Per-station temperature / humidity / wind-speed aggregates (mean, std, min/max where applicable)
   # Add this if you want to use the temperature and humidity data to predict the load.
   use_station_agg_features: false
+
+  # Robust aggregate and nonlinear weather features for HGB.
+  use_weather_aggregate_nonlinear_features: true
 
   # Per-station (tmpf - dwpf) plus mean/std across stations when pairs exist
   use_temp_dew_gap: false

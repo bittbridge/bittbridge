@@ -85,6 +85,7 @@ def _default_features():
         "use_time_features": False,
         "use_cyclical_features": False,
         "use_station_agg_features": False,
+        "use_weather_aggregate_nonlinear_features": False,
         "use_temp_dew_gap": False,
         "use_load_lags": False,
         "use_load_rolling": False,
@@ -164,6 +165,10 @@ FEATURE_COMBOS = [
     pytest.param({"use_time_features": True}, id="time"),
     pytest.param({"use_cyclical_features": True}, id="cyclical"),
     pytest.param({"use_station_agg_features": True}, id="station_agg"),
+    pytest.param(
+        {"use_cyclical_features": True, "use_weather_aggregate_nonlinear_features": True},
+        id="weather_aggregate_nonlinear",
+    ),
     pytest.param({"use_temp_dew_gap": True}, id="temp_dew_gap"),
     pytest.param({"use_load_lags": True, "load_lag_steps": [12, 24, 72]}, id="lags"),
     pytest.param({"use_load_delta": True}, id="delta_only"),
@@ -413,6 +418,41 @@ def test_linear_with_weather_suffix_whitelist(tmp_path):
     result = train_model("linear", cfg)
     assert "4B8-drct" not in result.train_frame.columns
     assert result.metrics["validation"]["rmse"] >= 0.0
+
+
+def test_weather_aggregate_nonlinear_features_are_robust_to_missing_station_columns():
+    frame = pd.DataFrame(
+        {
+            "dt": pd.date_range("2025-01-01", periods=2, freq="h"),
+            "4B8-tmpf": [70.0, 60.0],
+            "BDL-tmpf": [74.0, 62.0],
+            "4B8-relh": [50.0, 60.0],
+        }
+    )
+
+    out = add_engineered_features(
+        frame,
+        {
+            "use_cyclical_features": True,
+            "use_weather_aggregate_nonlinear_features": True,
+        },
+    )
+
+    assert out["avg_tmpf"].tolist() == pytest.approx([72.0, 61.0])
+    assert out["max_tmpf"].tolist() == pytest.approx([74.0, 62.0])
+    assert out["min_tmpf"].tolist() == pytest.approx([70.0, 60.0])
+    assert out["temp_spread"].tolist() == pytest.approx([4.0, 2.0])
+    assert out["cooling_degree_avg"].tolist() == pytest.approx([7.0, 0.0])
+    assert out["heating_degree_avg"].tolist() == pytest.approx([0.0, 4.0])
+    assert out["avg_tmpf_x_hour_sin"].tolist() == pytest.approx(
+        (out["avg_tmpf"] * out["hour_sin"]).tolist()
+    )
+    assert out["avg_tmpf_x_hour_cos"].tolist() == pytest.approx(
+        (out["avg_tmpf"] * out["hour_cos"]).tolist()
+    )
+    assert out["avg_relh"].tolist() == pytest.approx([50.0, 60.0])
+    assert "avg_dwpf" not in out.columns
+    assert "avg_sped" not in out.columns
 
 
 def test_load_config_rejects_unknown_weather_suffix(tmp_path):

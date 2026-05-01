@@ -22,6 +22,7 @@ FEATURE_BOOL_KEYS = (
     "use_time_features",
     "use_cyclical_features",
     "use_station_agg_features",
+    "use_weather_aggregate_nonlinear_features",
     "use_temp_dew_gap",
     "use_load_lags",
     "use_load_rolling",
