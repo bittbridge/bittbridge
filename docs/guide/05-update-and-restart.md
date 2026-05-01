@@ -1,8 +1,17 @@
 # 5. Update and restart
 
-Use this when the repo has new commits on `main` and you need to **pull** on your GCP VM, **refresh dependencies**, and **restart** your miner.
+Use this when the repo has new commits on main, or when you want to train a better model and deploy it.
 
-**Assumes:** You run the miner in tmux as in [4. Run Miner](04-run-miner.md), session name `miner`.
+**Assumption:** You run the miner in tmux as in [4. Run Miner](04-run-miner.md), session name `miner`.
+
+## ⚠️ Important mindset (READ FIRST)
+
+* Your miner can keep running while you experiment
+* You do NOT need to stop tmux to test models
+* restart the miner after you are ready to deploy a new model
+
+👉 Think of tmux as a running container
+👉 Your experiments happen outside of it
 
 ---
 
@@ -30,17 +39,7 @@ Quick reference for the shell on your VM (run these inside SSH):
 
 ---
 
-## 1. Stop the miner
-
-```bash
-tmux attach -t miner
-```
-
-Press **`Ctrl+C`** to stop the miner. Detach: **`Ctrl+b`** then **`d`**.
-
----
-
-## 2. Pull the latest code
+## 1. Pull the latest code
 
 ```bash
 cd ~/bittbridge
@@ -49,7 +48,7 @@ git pull
 
 ---
 
-## 3. Update Python dependencies
+## 2. Update Python dependencies
 
 After every pull, **sync your venv** so new or updated libraries from the repo are installed:
 
@@ -79,15 +78,42 @@ cd ~/bittbridge
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+## 3. Experiment with your models 
+
+* Train models
+* Try different feature combinations
+* Evaluate performance (MAE, R², scatter plot)
+
+## 5. Restart miner (DEPLOY)
+
+(if first time -> tmux new -s miner)
+
+```bash
+tmux attach -t miner
+```
+
+Press **`Ctrl+C`** to stop the miner. 
+
+Run miner with updated specs:
+
+```bash
+cd ~/bittbridge
+python -m neurons.miner \
+  --netuid 183 \
+  --subtensor.network test \
+  --wallet.name miner \
+  --wallet.hotkey default \
+  --logging.debug
+```
+Detach from tmux session: **`Ctrl+b`** then **`d`**
 
 ---
 
-| Step | Action |
-|------|--------|
-| 1 | `tmux attach -t miner` → `Ctrl+C` → detach |
-| 2 | `cd ~/bittbridge` && `git pull origin main` |
-| 3 | `source venv/bin/activate` && `pip install -r requirements.txt` |
-| 4 | Restart miner in `miner` session → detach |
+#❗ Important notes
+
+* Your old model will continue running until you restart the miner
+* Your new model is only used after restart
+* Leaderboard updates only after predictions + ground truth (~6 hours delay)
 
 ---
 

@@ -4,38 +4,20 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional
 
+from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
+from bittbridge.utils.timestamp import get_now
+
+from .custom_plugin_runtime import CustomModelWrapper
 from .ml_config import ModelConfig
 from .pipeline import (
     TrainingResult,
+    live_probe_feature_matrix_for_custom,
     predict_for_timestamp_with_context,
     predict_single_test_row_with_context,
 )
 
-try:
-    import bittensor as bt
-except ModuleNotFoundError:  # pragma: no cover - local ML tests can run without miner deps.
-    class _NoopLogging:
-        def __getattr__(self, _name):
-            def _log(*_args, **_kwargs):
-                return None
-
-            return _log
-
-    class _BittensorShim:
-        logging = _NoopLogging()
-
-    bt = _BittensorShim()
-
-DEFAULT_FALLBACK_LOAD_MW = 15000.0
-
 
 def _get_latest_load_values(n_steps: int) -> Optional[list]:
-    try:
-        from bittbridge.utils.iso_ne_api import fetch_fiveminute_system_load
-        from bittbridge.utils.timestamp import get_now
-    except ModuleNotFoundError:
-        return None
-
     now = get_now()
     today = now.strftime("%Y%m%d")
     data = fetch_fiveminute_system_load(today, use_cache=False)
@@ -91,11 +73,38 @@ class SupabaseLiveAdvancedPredictor:
         return pred
 
 
+@dataclass
+class CustomModelPredictor:
+    """
+    User-provided sklearn or Keras regression model; features match plugin feature_contract.json.
+    """
+
+    wrapper: CustomModelWrapper
+    config: ModelConfig
+    features: list[str]
+    sequence_n_steps: int | None = None
+    last_prediction_context: dict[str, Any] = None
+
+    def predict(self, timestamp: str) -> Optional[float]:
+        X, ctx = live_probe_feature_matrix_for_custom(
+            self.config,
+            timestamp,
+            self.features,
+            self.sequence_n_steps,
+        )
+        vals = self.wrapper.predict_values(X)
+        pred = float(vals.ravel()[0])
+        self.last_prediction_context = {
+            **ctx,
+            "custom_model_input_shape": list(X.shape),
+            "custom_model_kind": self.wrapper.kind,
+        }
+        return pred
+
+
 class PredictorRouter:
-    def __init__(self, predictor, fallback_predictor=None, default_prediction: float = DEFAULT_FALLBACK_LOAD_MW):
+    def __init__(self, predictor):
         self._predictor = predictor
-        self._fallback_predictor = fallback_predictor or BaselineMovingAveragePredictor()
-        self._default_prediction = float(default_prediction)
         self.mode = "baseline"
         self.last_prediction_context: dict[str, Any] = {}
 
@@ -105,30 +114,7 @@ class PredictorRouter:
         self.last_prediction_context = {}
 
     def predict(self, timestamp: str) -> Optional[float]:
-        try:
-            value = self._predictor.predict(timestamp)
-            if value is not None:
-                return float(value)
-            bt.logging.warning(
-                f"[{self.mode}] Predictor returned no value for timestamp={timestamp}; using fallback."
-            )
-        except Exception as exc:
-            bt.logging.error(
-                f"[{self.mode}] Predictor failed for timestamp={timestamp}; using fallback: {exc}"
-            )
-
-        try:
-            fallback_value = self._fallback_predictor.predict(timestamp)
-            if fallback_value is not None:
-                return float(fallback_value)
-            bt.logging.warning(
-                f"Fallback predictor returned no value for timestamp={timestamp}; "
-                f"using default {self._default_prediction:.1f}."
-            )
-        except Exception as exc:
-            bt.logging.error(
-                f"Fallback predictor failed for timestamp={timestamp}; "
-                f"using default {self._default_prediction:.1f}: {exc}"
-            )
-        return self._default_prediction
+        pred = self._predictor.predict(timestamp)
+        self.last_prediction_context = getattr(self._predictor, "last_prediction_context", {}) or {}
+        return pred
 

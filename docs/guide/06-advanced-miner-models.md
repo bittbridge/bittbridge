@@ -5,6 +5,8 @@ if you made it through the **moving average** baseline in [4. Run Miner](04-run-
 
 This page is about **how to run** that path and **what to tune**. You do **not** need to change data pipelines, Supabase settings, or persistence—the project keeps that for you. Focus on **`features`** and **`models hyperparameters`**, at the repo root.
 
+If you want to train externally (Colab) and deploy your own dumped artifact, use [7. Custom models](07-custom-models.md).
+
 ---
 
 ## Performance vs. compute
@@ -112,4 +114,4 @@ Curious how live rows and tables and data fit together? Read [App workflow and S
 
 ---
 
-[← 5. Update and restart](05-update-and-restart.md) · [Guide](../../README.md#guide)
+[← 5. Update and restart](05-update-and-restart.md) · [7. Custom models →](07-custom-models.md) · [Guide](../../README.md#guide)

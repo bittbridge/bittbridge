@@ -111,6 +111,27 @@ def fetch_supabase_train_all(client, schema: str, table: str, page_size: int = 1
     return normalize_supabase_train_frame(pd.DataFrame(rows))
 
 
+def pick_forecast_row_for_horizon(
+    candidates: list[Dict[str, Any]], horizon_min: int
+) -> Dict[str, Any] | None:
+    """
+    Pick one test/forecast row from candidates matching horizon_min when that column exists.
+    Same rules as fetch_supabase_test_row (strict horizon when column present).
+    """
+    if not candidates:
+        return None
+    has_horizon = any((row.get("horizon_min") is not None) for row in candidates)
+    if has_horizon:
+        for row in candidates:
+            value = row.get("horizon_min")
+            if value is None:
+                continue
+            if int(value) == int(horizon_min):
+                return row
+        return None
+    return candidates[0]
+
+
 def fetch_supabase_train_tail(client, schema: str, table: str, n_rows: int) -> pd.DataFrame:
     response = (
         client.schema(schema)
@@ -127,33 +148,6 @@ def fetch_supabase_train_tail(client, schema: str, table: str, n_rows: int) -> p
     return frame.tail(int(n_rows)).reset_index(drop=True)
 
 
-def fetch_supabase_train_tail_before(
-    client,
-    schema: str,
-    table: str,
-    n_rows: int,
-    before_dt: str | pd.Timestamp,
-) -> pd.DataFrame:
-    cutoff = parse_timestamp_for_supabase(str(before_dt))
-    cutoff_text = cutoff.strftime("%Y-%m-%d %H:%M:%S")
-    response = (
-        client.schema(schema)
-        .table(table)
-        .select("*")
-        .lt(TIMESTAMP_COLUMN, cutoff_text)
-        .order(TIMESTAMP_COLUMN, desc=True)
-        .limit(int(n_rows))
-        .execute()
-    )
-    rows = response.data or []
-    if not rows:
-        raise ValueError(
-            f"Supabase `{schema}.{table}` returned no rows before {cutoff_text} for live history."
-        )
-    frame = normalize_supabase_train_frame(pd.DataFrame(rows))
-    return frame.tail(int(n_rows)).reset_index(drop=True)
-
-
 def fetch_supabase_test_row(
     client,
     schema: str,
@@ -162,30 +156,13 @@ def fetch_supabase_test_row(
     horizon_min: int,
     nearest_fallback_minutes: int | None = None,
 ) -> Dict[str, Any] | None:
-    def _pick_row(candidates: list[Dict[str, Any]]) -> Dict[str, Any] | None:
-        if not candidates:
-            return None
-        has_horizon = any((row.get("horizon_min") is not None) for row in candidates)
-        if has_horizon:
-            for row in candidates:
-                value = row.get("horizon_min")
-                if value is None:
-                    continue
-                if int(value) == int(horizon_min):
-                    return row
-            # Strict behavior: if horizon_min exists on returned rows but none match,
-            # do not silently use a different horizon forecast.
-            return None
-        # Backward compatibility for legacy rows without horizon_min.
-        return candidates[0]
-
     candidate_ts = timestamp_candidates_for_supabase(dt_target)
     candidate_exact = [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in candidate_ts]
 
     for dt_exact in candidate_exact:
         response = client.schema(schema).table(table).select("*").eq(TIMESTAMP_COLUMN, dt_exact).execute()
         rows = response.data or []
-        picked = _pick_row(rows)
+        picked = pick_forecast_row_for_horizon(rows, horizon_min)
         if picked is not None:
             return picked
 
@@ -205,7 +182,58 @@ def fetch_supabase_test_row(
             .execute()
         )
         nearby_rows = around.data or []
-        picked = _pick_row(nearby_rows)
+        picked = pick_forecast_row_for_horizon(nearby_rows, horizon_min)
         if picked is not None:
             return picked
     return None
+
+
+def fetch_latest_forecast_row_matching_horizon(
+    client,
+    schema: str,
+    table: str,
+    horizon_min: int,
+    limit: int = 2000,
+) -> Dict[str, Any] | None:
+    """
+    Newest rows first; return the first row matching horizon_min (or legacy row without horizon).
+    Used when no forecast exists near wall-clock time (e.g. deploy compatibility probe).
+    """
+    response = (
+        client.schema(schema)
+        .table(table)
+        .select("*")
+        .order(TIMESTAMP_COLUMN, desc=True)
+        .limit(int(limit))
+        .execute()
+    )
+    rows = response.data or []
+    return pick_forecast_row_for_horizon(rows, horizon_min)
+
+
+def fetch_supabase_test_row_for_probe(
+    client,
+    schema: str,
+    table: str,
+    dt_target: str,
+    horizon_min: int,
+) -> Dict[str, Any] | None:
+    """
+    Resolve a forecast row for offline compatibility checks: try tight windows around dt_target,
+    then fall back to the latest stored row for this horizon. Validator-facing paths should keep
+    using fetch_supabase_test_row with a small nearest_fallback_minutes.
+    """
+    for fb in (5, 60, 360, 1440, 10080):
+        row = fetch_supabase_test_row(
+            client,
+            schema,
+            table,
+            dt_target,
+            horizon_min,
+            nearest_fallback_minutes=fb,
+        )
+        if row is not None:
+            return row
+    return fetch_latest_forecast_row_matching_horizon(
+        client, schema, table, horizon_min, limit=2000
+    )

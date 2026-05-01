@@ -45,7 +45,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 1. **Clone:** `git clone https://github.com/bittbridge/bittbridge.git`
 2. **ISO-NE:** [Create account](https://www.iso-ne.com/isoexpress/login?p_p_id=com_liferay_login_web_portlet_LoginPortlet&p_p_lifecycle=0&p_p_state=maximized&p_p_mode=view&_com_liferay_login_web_portlet_LoginPortlet_mvcRenderCommandName=%2Flogin%2Fcreate_account&saveLastPath=false) → put username/password in `.env` (from `.env.example`)
 3. **Check API:** `python scripts/check_iso_ne_api.py`
-4. **Follow steps 1–4 below** (GCP VM + moving average miner). **Next:** [5. Update and restart](docs/guide/05-update-and-restart.md) when the repo changes, then [6. Advanced miner models](docs/guide/06-advanced-miner-models.md) to experiment with ML beyond the baseline.
+4. **Follow steps 1–4 below** (GCP VM + moving average miner). **Next:** [5. Update and restart](docs/guide/05-update-and-restart.md) when the repo changes, then [6. Advanced miner models](docs/guide/06-advanced-miner-models.md) to experiment with ML beyond the baseline, then [7. Custom models](docs/guide/07-custom-models.md) for export/train/deploy flow.
 
 ---
 
@@ -59,6 +59,7 @@ Validators send challenges to miners. Miners respond with predictions. Validator
 | **4** | [Run miner](docs/guide/04-run-miner.md) — moving average in `neurons/miner.py` |
 | **5** | [Update and restart](docs/guide/05-update-and-restart.md) — pull, `pip install`, restart miner |
 | **6** | [Advanced miner models](docs/guide/06-advanced-miner-models.md) — features & models in `model_params.yaml` |
+| **7** | [Custom models](docs/guide/07-custom-models.md) — export plugin folder, train externally, deploy custom model |
 
 **Optional:** [Incentive mechanism](docs/guide/incentive-mechanism.md) (how rewards work). **Optional:** [App workflow and Supabase](docs/guide/app-workflow-supabase.md) (plain-language data + prediction flow).
 

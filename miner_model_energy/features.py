@@ -10,11 +10,7 @@ from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN
 # Raw ISO-NE-style columns are named "<station>-<suffix>". Used for optional whitelist filtering.
 KNOWN_WEATHER_SUFFIXES = frozenset({"tmpf", "dwpf", "relh", "sped", "drct"})
 
-# Load lags are past-demand rows relative to prediction issue time t. Positive
-# lags such as 12 and 24 are safe even for a 6-hour target because they do not
-# look at demand between t and t+6h.
-MIN_LOAD_LAG_STEPS = 1
-DEFAULT_LAGS = [12, 24, 72, 144, 288]
+DEFAULT_LAGS = [1, 2]
 DEFAULT_ROLLING_WINDOWS = [3, 6]
 DEFAULT_EXCLUDE_COLS = {
     TIMESTAMP_COLUMN,
@@ -94,13 +90,17 @@ def _row_std_across_stations(frame: pd.DataFrame) -> pd.Series:
     return frame.std(axis=1, ddof=0)
 
 
-def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame:
+def add_engineered_features(
+    df: pd.DataFrame,
+    feature_cfg: Dict,
+    timestamp_source: Optional[pd.Series] = None,
+) -> pd.DataFrame:
     """
     Feature families mirror manual notebook setup.
     All groups are gated by feature_cfg booleans (defaults are False in YAML).
     """
     out = df.copy()
-    ts = out[TIMESTAMP_COLUMN]
+    ts = timestamp_source if timestamp_source is not None else out[TIMESTAMP_COLUMN]
 
     if feature_cfg.get("use_time_features", False):
         out["hour"] = ts.dt.hour
@@ -131,25 +131,6 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
             out["sped_std"] = _row_std_across_stations(out[sped_cols])
             out["sped_max"] = out[sped_cols].max(axis=1)
 
-    if feature_cfg.get("use_weather_aggregate_nonlinear_features", False):
-        if tmpf_cols:
-            out["avg_tmpf"] = out[tmpf_cols].mean(axis=1)
-            out["max_tmpf"] = out[tmpf_cols].max(axis=1)
-            out["min_tmpf"] = out[tmpf_cols].min(axis=1)
-            out["temp_spread"] = out["max_tmpf"] - out["min_tmpf"]
-            out["cooling_degree_avg"] = np.maximum(out["avg_tmpf"] - 65.0, 0.0)
-            out["heating_degree_avg"] = np.maximum(65.0 - out["avg_tmpf"], 0.0)
-            if "hour_sin" in out.columns:
-                out["avg_tmpf_x_hour_sin"] = out["avg_tmpf"] * out["hour_sin"]
-            if "hour_cos" in out.columns:
-                out["avg_tmpf_x_hour_cos"] = out["avg_tmpf"] * out["hour_cos"]
-        if dwpf_cols:
-            out["avg_dwpf"] = out[dwpf_cols].mean(axis=1)
-        if relh_cols:
-            out["avg_relh"] = out[relh_cols].mean(axis=1)
-        if sped_cols:
-            out["avg_sped"] = out[sped_cols].mean(axis=1)
-
     if feature_cfg.get("use_temp_dew_gap", False) and tmpf_cols and dwpf_cols:
         station_prefixes = sorted({c.split("-")[0] for c in tmpf_cols})
         gap_cols: List[str] = []
@@ -172,8 +153,6 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
 
         if feature_cfg.get("use_load_rolling", False):
             windows = feature_cfg.get("rolling_load_windows", DEFAULT_ROLLING_WINDOWS)
-            # Load features are relative to the prediction issue time t. shift(1)
-            # means the most recent completed 5-minute load before t, never t+future.
             shifted_load = out[TARGET_COLUMN].shift(1)
             for window in windows:
                 w = int(window)
@@ -182,13 +161,12 @@ def add_engineered_features(df: pd.DataFrame, feature_cfg: Dict) -> pd.DataFrame
                 out[f"load_roll_std_{w}"] = roll.std()
                 out[f"load_roll_min_{w}"] = roll.min()
                 out[f"load_roll_max_{w}"] = roll.max()
-            out["load_delta_1"] = shifted_load - shifted_load.shift(1)
-            out["load_delta_3"] = shifted_load - shifted_load.shift(3)
-            out["load_delta_12"] = shifted_load - shifted_load.shift(12)
+            out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
+            out["load_delta_3"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(4)
+            out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
         elif feature_cfg.get("use_load_delta", False):
-            shifted_load = out[TARGET_COLUMN].shift(MIN_LOAD_LAG_STEPS)
-            out["load_delta_1"] = shifted_load - shifted_load.shift(1)
-            out["load_delta_12"] = shifted_load - shifted_load.shift(12)
+            out["load_delta_1"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(2)
+            out["load_delta_12"] = out[TARGET_COLUMN].shift(1) - out[TARGET_COLUMN].shift(13)
 
     _drop_features_disabled_by_config(out, feature_cfg)
     return out
@@ -227,23 +205,6 @@ def _drop_features_disabled_by_config(out: pd.DataFrame, feature_cfg: Dict) -> N
             "sped_mean",
             "sped_std",
             "sped_max",
-        ):
-            if col in out.columns:
-                out.drop(columns=[col], inplace=True)
-
-    if not feature_cfg.get("use_weather_aggregate_nonlinear_features", False):
-        for col in (
-            "avg_tmpf",
-            "max_tmpf",
-            "min_tmpf",
-            "avg_dwpf",
-            "avg_relh",
-            "avg_sped",
-            "temp_spread",
-            "cooling_degree_avg",
-            "heating_degree_avg",
-            "avg_tmpf_x_hour_sin",
-            "avg_tmpf_x_hour_cos",
         ):
             if col in out.columns:
                 out.drop(columns=[col], inplace=True)
@@ -307,8 +268,8 @@ def add_test_load_features_from_history(
         for window in windows:
             window = int(window)
             if n_hist < window:
-                raise ValueError(f"Need at least {window} rows of history for rolling window {window}.")
-            hist_window = load_hist.tail(window)
+                raise ValueError(f"Not enough history for rolling window {window}.")
+            hist_window = load_hist.iloc[-window:]
             out[f"load_roll_mean_{window}"] = float(hist_window.mean())
             out[f"load_roll_std_{window}"] = float(hist_window.std())
             out[f"load_roll_min_{window}"] = float(hist_window.min())

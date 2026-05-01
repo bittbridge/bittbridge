@@ -150,7 +150,7 @@ def load_train_from_storage_parts(config: ModelConfig, force_refresh: bool) -> p
 
     try:
         print(
-            "  [train]     Fetching training data from Supabase Storage and building local cache...",
+            "  [train]     Fetching training data from Supabase Storage and building local cache…",
             flush=True,
         )
         print("  [train]     This update usually takes 2-3 minutes.", flush=True)

@@ -7,24 +7,10 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import bittensor as bt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-try:
-    import bittensor as bt
-except ModuleNotFoundError:  # pragma: no cover - local ML tests can run without miner deps.
-    class _NoopLogging:
-        def __getattr__(self, _name):
-            def _log(*_args, **_kwargs):
-                return None
-
-            return _log
-
-    class _BittensorShim:
-        logging = _NoopLogging()
-
-    bt = _BittensorShim()
 
 from .artifacts import (
     feature_signature,
@@ -35,7 +21,6 @@ from .artifacts import (
 from .data_io import TARGET_COLUMN, TARGET_COLUMN_HORIZON, TIMESTAMP_COLUMN, load_train_test
 from .features import (
     KNOWN_WEATHER_SUFFIXES,
-    MIN_LOAD_LAG_STEPS,
     add_engineered_features,
     add_test_load_features_from_history,
     build_feature_columns,
@@ -44,19 +29,17 @@ from .features import (
 from .ml_config import ModelConfig
 from .models_cart import predict_cart, save_cart, train_cart
 from .models_cart import load_cart
-from .models_hgb import load_hgb, predict_hgb, save_hgb, train_hgb
 from .models_linear import LinearBundle, load_linear, predict_linear, save_linear, train_linear
 from .models_lstm import LSTM_SCALER_FILENAME, load_lstm, make_sequences, predict_lstm, save_lstm, train_lstm
-from .models_rf import load_rf, predict_rf, save_rf, train_rf
 from .models_rnn import RNN_SCALER_FILENAME, load_rnn, predict_rnn, save_rnn, train_rnn
 from .split import temporal_train_val_split
 from .supabase_io import (
     create_supabase_data_client,
     fetch_supabase_test_row,
+    fetch_supabase_test_row_for_probe,
     fetch_supabase_train_all,
-    fetch_supabase_train_tail_before,
+    fetch_supabase_train_tail,
     normalize_supabase_test_frame,
-    parse_timestamp_for_supabase,
 )
 from .storage_train_io import load_train_from_storage_parts
 
@@ -75,8 +58,6 @@ class TrainingResult:
     y_val: np.ndarray = field(default_factory=lambda: np.array([]))
     val_pred: np.ndarray = field(default_factory=lambda: np.array([]))
     durations_sec: Dict[str, float] = field(default_factory=dict)
-    forecast_horizon_min: int = 0
-    horizon_steps: int = 0
 
 
 def _as_numpy(frame: pd.DataFrame, features: List[str]) -> np.ndarray:
@@ -149,6 +130,22 @@ def _apply_supabase_storage_feature_shift(
             flush=True,
         )
     return shifted, True, steps
+
+
+def _shifted_timestamp_source_for_engineered_features(
+    train: pd.DataFrame,
+    config: ModelConfig,
+    feature_shift_active: bool,
+    feature_shift_steps: int,
+) -> pd.Series | None:
+    if not feature_shift_active or feature_shift_steps <= 0:
+        return None
+    if not (
+        config.features.get("use_time_features", False)
+        or config.features.get("use_cyclical_features", False)
+    ):
+        return None
+    return train[TIMESTAMP_COLUMN].shift(-feature_shift_steps)
 
 
 def _fmt_sec(seconds: float) -> str:
@@ -227,7 +224,7 @@ def print_actual_vs_predicted_plotext(result: TrainingResult, model_label: str) 
             plt.scatter(xa, yb, label="model")
             plt.xlabel("actual")
             plt.ylabel("predicted")
-            plt.title(f"{model_label} - Actual vs predicted ({title_suffix})")
+            plt.title(f"{model_label} — Actual vs predicted ({title_suffix})")
             plt.show()
     except Exception as exc:
         print(f"  Warning: could not render plotext charts ({exc}).")
@@ -311,11 +308,17 @@ def prepare_training_data(
     train, feature_shift_active, feature_shift_steps = _apply_supabase_storage_feature_shift(
         train, config, show_progress=show_progress
     )
+    shifted_time_source = _shifted_timestamp_source_for_engineered_features(
+        train,
+        config,
+        feature_shift_active=feature_shift_active,
+        feature_shift_steps=feature_shift_steps,
+    )
 
     suffix_whitelist = config.features.get("include_weather_suffix_groups")
     train = filter_weather_suffix_columns(train, suffix_whitelist)
     test = filter_weather_suffix_columns(test, suffix_whitelist)
-    train = add_engineered_features(train, config.features)
+    train = add_engineered_features(train, config.features, timestamp_source=shifted_time_source)
     test = add_engineered_features(test, config.features)
 
     feats_cfg = config.features
@@ -354,8 +357,8 @@ def prepare_training_data(
     if feature_shift_active and disable_horizon_label_shift:
         if show_progress:
             print(
-                f"  [train]     Horizon target: forecast_horizon_min={horizon_min}, "
-                f"median_dt_min={median_m:.4f}, steps={steps} -> `{TARGET_COLUMN_HORIZON}`",
+                f"  [train]     Horizon label shift disabled: "
+                f"feature_shift_steps={feature_shift_steps}, using `{TARGET_COLUMN}` as target.",
                 flush=True,
             )
     else:
@@ -394,17 +397,15 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
 
     t0 = time.perf_counter()
     if show_progress:
-        print("  [train] (1/4) Loading CSVs and building features...", flush=True)
+        print("  [train] (1/4) Loading CSVs and building features…", flush=True)
     train_model, test, features = prepare_training_data(config, show_progress=show_progress)
-    horizon_min = int(config.data.get("forecast_horizon_min", 0))
-    horizon_steps = _forecast_horizon_steps(train_model, horizon_min) if horizon_min > 0 else 0
     t1 = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     done {_fmt_sec(t1 - t0)} - {len(train_model):,} rows, {len(features)} features",
+            f"  [train]     ✓ {_fmt_sec(t1 - t0)} — {len(train_model):,} rows, {len(features)} features",
             flush=True,
         )
-        print("  [train] (2/4) Building arrays and temporal train/val split...", flush=True)
+        print("  [train] (2/4) Building arrays and temporal train/val split…", flush=True)
     train_split, val_split = temporal_train_val_split(
         train_model, validation_split=config.training["validation_split"]
     )
@@ -419,13 +420,13 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     t2 = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     done {_fmt_sec(t2 - t1)} - train {X_train.shape}, val {X_val.shape}",
+            f"  [train]     ✓ {_fmt_sec(t2 - t1)} — train {X_train.shape}, val {X_val.shape}",
             flush=True,
         )
 
     rs = int(config.training.get("random_state", 42))
     if show_progress:
-        print(f"  [train] (3/4) Training {model_type} (fit + train/val predictions)...", flush=True)
+        print(f"  [train] (3/4) Training {model_type} (fit + train/val predictions)…", flush=True)
 
     t_fit_start = time.perf_counter()
     if model_type == "linear":
@@ -438,18 +439,6 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         bundle = train_cart(X_train, y_train, features, cart_cfg)
         train_pred = predict_cart(bundle, X_train)
         val_pred = predict_cart(bundle, X_val)
-    elif model_type == "rf":
-        rf_cfg = dict(config.models.get("rf", {}))
-        rf_cfg.setdefault("random_state", rs)
-        bundle = train_rf(X_train, y_train, features, rf_cfg)
-        train_pred = predict_rf(bundle, X_train)
-        val_pred = predict_rf(bundle, X_val)
-    elif model_type == "hgb":
-        hgb_cfg = dict(config.models.get("hgb", {}))
-        hgb_cfg.setdefault("random_state", rs)
-        bundle = train_hgb(X_train, y_train, features, hgb_cfg)
-        train_pred = predict_hgb(bundle, X_train)
-        val_pred = predict_hgb(bundle, X_val)
     elif model_type == "lstm":
         bundle = train_lstm(
             X_train,
@@ -500,10 +489,10 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
     t_fit_end = time.perf_counter()
     if show_progress:
         print(
-            f"  [train]     step (3/4) done in {_fmt_sec(t_fit_end - t_fit_start)}",
+            f"  [train]     ✓ step (3/4) done in {_fmt_sec(t_fit_end - t_fit_start)}",
             flush=True,
         )
-        print("  [train] (4/4) Aggregating train/validation metrics...", flush=True)
+        print("  [train] (4/4) Aggregating train/validation metrics…", flush=True)
 
     metrics = {
         "train": _metrics(y_train, train_pred),
@@ -519,7 +508,7 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         "total_sec": t3 - t0,
     }
     if show_progress:
-        print(f"  [train]     done - total {_fmt_sec(t3 - t0)}", flush=True)
+        print(f"  [train]     ✓ done — total {_fmt_sec(t3 - t0)}", flush=True)
 
     return TrainingResult(
         model_type=model_type,
@@ -540,8 +529,6 @@ def train_model(model_type: str, config: ModelConfig) -> TrainingResult:
         y_val=y_val,
         val_pred=val_pred,
         durations_sec=durations_sec,
-        forecast_horizon_min=horizon_min,
-        horizon_steps=horizon_steps,
     )
 
 
@@ -585,10 +572,6 @@ def predict_single_test_row_with_context(result: TrainingResult) -> tuple[float,
         pred = predict_linear(result.model_bundle, X_test)[0]
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, X_test)[0]
-    elif result.model_type == "rf":
-        pred = predict_rf(result.model_bundle, X_test)[0]
-    elif result.model_type == "hgb":
-        pred = predict_hgb(result.model_bundle, X_test)[0]
     elif result.model_type == "lstm":
         seq_2d = build_sequence_inference_matrix(result)
         pred = predict_lstm(result.model_bundle, seq_2d)[0]
@@ -628,18 +611,37 @@ def _required_history_rows_for_live(result: TrainingResult, config: ModelConfig)
             needed = max(needed, max_lag + (n_steps_seq - 1) + live_seq_buffer)
     if feats_cfg.get("use_load_rolling", False):
         rolling = [int(v) for v in feats_cfg.get("rolling_load_windows", [])]
-        max_window = max(rolling, default=1)
-        rolling_needed = MIN_LOAD_LAG_STEPS + max_window
-        needed = max(needed, rolling_needed)
-        if n_steps_seq is not None:
-            live_seq_buffer = 8
-            needed = max(needed, rolling_needed + (n_steps_seq - 1) + live_seq_buffer)
+        needed = max(needed, max(rolling, default=1) + 2, 16)
     if feats_cfg.get("use_load_delta", False) or feats_cfg.get("use_load_rolling", False):
-        delta_needed = MIN_LOAD_LAG_STEPS + 13
-        needed = max(needed, delta_needed)
+        needed = max(needed, 16)
+    return int(needed)
+
+
+def required_history_rows_for_probe(config: ModelConfig, sequence_n_steps: int | None) -> int:
+    """
+    Row count for Supabase train-tail fetch when probing live features for custom models.
+    Mirrors _required_history_rows_for_live without requiring a full TrainingResult.
+    """
+    feats_cfg = config.features
+    needed = 32
+    n_steps_seq: int | None = None
+    if sequence_n_steps is not None and int(sequence_n_steps) > 1:
+        n_steps_seq = int(sequence_n_steps)
+        needed = max(needed, n_steps_seq)
+    if feats_cfg.get("use_load_lags", False):
+        lag_steps = [int(v) for v in feats_cfg.get("load_lag_steps", [])]
+        max_lag = max(lag_steps, default=1)
+        needed = max(needed, max_lag + 2)
+        # shift(max_lag) leaves the first max_lag rows NaN in load_lag_*; dropna() then
+        # needs enough tail rows for (n_steps - 1) prior timesteps for LSTM/RNN live inference.
         if n_steps_seq is not None:
             live_seq_buffer = 8
-            needed = max(needed, delta_needed + (n_steps_seq - 1) + live_seq_buffer)
+            needed = max(needed, max_lag + (n_steps_seq - 1) + live_seq_buffer)
+    if feats_cfg.get("use_load_rolling", False):
+        rolling = [int(v) for v in feats_cfg.get("rolling_load_windows", [])]
+        needed = max(needed, max(rolling, default=1) + 2, 16)
+    if feats_cfg.get("use_load_delta", False) or feats_cfg.get("use_load_rolling", False):
+        needed = max(needed, 16)
     return int(needed)
 
 
@@ -657,6 +659,155 @@ def _build_live_sequence_matrix(
         )
     x_test = test_row[features].astype(float).to_numpy()
     return np.vstack([prior[-need_prior:], x_test])
+
+
+def live_probe_feature_matrix_for_custom(
+    config: ModelConfig,
+    timestamp_str: str,
+    feature_list: List[str],
+    sequence_n_steps: int | None,
+    *,
+    use_resilient_forecast_fetch: bool = False,
+) -> tuple[np.ndarray, Dict[str, Any]]:
+    """
+    Build the same engineered feature matrix used at inference time for a custom plugin model.
+    Returns X with shape (1, n_features) for dense / sklearn models, or (1, n_steps, n_features) for sequence Keras.
+    """
+    source = config.data.get("source", "csv")
+    if source not in {"supabase", "supabase_storage"}:
+        train_model, test, _ = prepare_training_data(config, show_progress=False)
+        if test.empty:
+            raise ValueError("CSV probe: test frame is empty.")
+        missing = [c for c in feature_list if c not in test.columns]
+        if missing:
+            raise ValueError(
+                "CSV probe: test frame missing feature columns: " + ", ".join(missing[:30])
+            )
+        ts = pd.to_datetime(timestamp_str, errors="coerce")
+        if pd.isna(ts):
+            row_df = test.iloc[[-1]]
+        else:
+            test_sorted = test.sort_values(TIMESTAMP_COLUMN)
+            dt_series = test_sorted[TIMESTAMP_COLUMN]
+            pos = int((dt_series - ts).abs().values.argmin())
+            row_df = test_sorted.iloc[[pos]]
+        missing_hist = [c for c in feature_list if c not in train_model.columns]
+        if missing_hist:
+            raise ValueError(
+                "CSV probe: train frame missing feature columns: " + ", ".join(missing_hist[:30])
+            )
+        n_seq = int(sequence_n_steps or 0)
+        if n_seq > 1:
+            seq = _build_live_sequence_matrix(train_model, row_df, feature_list, n_seq)
+            X = np.asarray(seq[np.newaxis, :, :], dtype=np.float32)
+        else:
+            X = row_df[feature_list].astype(float).to_numpy(dtype=np.float32)
+            if X.ndim == 1:
+                X = X[np.newaxis, :]
+        ctx: Dict[str, Any] = {
+            "source": source,
+            "requested_timestamp": timestamp_str,
+            "model_input_row": row_df[feature_list].iloc[0].to_dict(),
+        }
+        return X, ctx
+
+    data_cfg = config.data
+    schema = data_cfg["supabase_schema"]
+    train_table = data_cfg["supabase_train_table"]
+    test_table = data_cfg["supabase_test_table"]
+    horizon = int(data_cfg.get("forecast_horizon_min", 5))
+    page_size = int(data_cfg.get("supabase_page_size", 1000))
+    needed_rows = required_history_rows_for_probe(config, sequence_n_steps)
+
+    try:
+        client = create_supabase_data_client(data_cfg["supabase_url"], data_cfg["supabase_key"])
+        history = fetch_supabase_train_tail(client, schema=schema, table=train_table, n_rows=needed_rows)
+        if use_resilient_forecast_fetch:
+            forecast_row = fetch_supabase_test_row_for_probe(
+                client,
+                schema=schema,
+                table=test_table,
+                dt_target=timestamp_str,
+                horizon_min=horizon,
+            )
+        else:
+            forecast_row = fetch_supabase_test_row(
+                client,
+                schema=schema,
+                table=test_table,
+                dt_target=timestamp_str,
+                horizon_min=horizon,
+                nearest_fallback_minutes=5,
+            )
+    except Exception as exc:
+        raise ValueError(
+            "Supabase live probe failed while fetching data "
+            f"(schema={schema}, train_table={train_table}, test_table={test_table}, "
+            f"timestamp={timestamp_str}, horizon_min={horizon}, page_size={page_size}): {exc}"
+        ) from exc
+
+    if forecast_row is None:
+        raise ValueError(
+            "Supabase live probe found no forecast row "
+            f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
+        )
+
+    forecast_frame = normalize_supabase_test_frame(pd.DataFrame([forecast_row]))
+    suffix_whitelist = config.features.get("include_weather_suffix_groups")
+    history_filtered = filter_weather_suffix_columns(history, suffix_whitelist)
+    forecast_filtered = filter_weather_suffix_columns(forecast_frame, suffix_whitelist)
+
+    history_features = add_engineered_features(history_filtered, config.features)
+    test_features = add_engineered_features(forecast_filtered, config.features)
+    feats_cfg = config.features
+    if (
+        feats_cfg.get("use_load_lags", False)
+        or feats_cfg.get("use_load_rolling", False)
+        or feats_cfg.get("use_load_delta", False)
+    ):
+        test_features = add_test_load_features_from_history(test_features, history_filtered, feats_cfg)
+
+    missing = [c for c in feature_list if c not in test_features.columns]
+    if missing:
+        raise ValueError(
+            "Live probe: forecast row missing feature columns: " + ", ".join(missing[:20])
+            + (" ..." if len(missing) > 20 else "")
+        )
+    missing_history = [c for c in feature_list if c not in history_features.columns]
+    if missing_history:
+        raise ValueError(
+            "Live probe: history rows missing feature columns: " + ", ".join(missing_history[:20])
+            + (" ..." if len(missing_history) > 20 else "")
+        )
+
+    n_seq = int(sequence_n_steps or 0)
+    if n_seq > 1:
+        seq = _build_live_sequence_matrix(
+            history_features=history_features,
+            test_row=test_features,
+            features=feature_list,
+            n_steps=n_seq,
+        )
+        X = np.asarray(seq[np.newaxis, :, :], dtype=np.float32)
+    else:
+        X = test_features[feature_list].astype(float).to_numpy(dtype=np.float32)
+        if X.ndim == 1:
+            X = X[np.newaxis, :]
+
+    model_input_row = (
+        test_features[feature_list].iloc[0].to_dict()
+        if not test_features.empty
+        else {}
+    )
+    latest_train_row = history.iloc[-1].to_dict() if not history.empty else {}
+    ctx = {
+        "source": source,
+        "requested_timestamp": timestamp_str,
+        "forecast_row_raw": forecast_row,
+        "train_row_latest_raw": latest_train_row,
+        "model_input_row": model_input_row,
+    }
+    return X, ctx
 
 
 def predict_for_timestamp(result: TrainingResult, config: ModelConfig, timestamp_str: str) -> float:
@@ -681,15 +832,7 @@ def predict_for_timestamp_with_context(
     try:
         client = create_supabase_data_client(data_cfg["supabase_url"], data_cfg["supabase_key"])
         needed_rows = _required_history_rows_for_live(result, config)
-        target_ts = parse_timestamp_for_supabase(timestamp_str)
-        issue_ts = target_ts - pd.Timedelta(minutes=horizon)
-        history = fetch_supabase_train_tail_before(
-            client,
-            schema=schema,
-            table=train_table,
-            n_rows=needed_rows,
-            before_dt=issue_ts,
-        )
+        history = fetch_supabase_train_tail(client, schema=schema, table=train_table, n_rows=needed_rows)
         forecast_row = fetch_supabase_test_row(
             client,
             schema=schema,
@@ -710,16 +853,9 @@ def predict_for_timestamp_with_context(
             "Supabase live inference found no forecast row "
             f"(schema={schema}, table={test_table}, timestamp={timestamp_str}, horizon_min={horizon})."
         )
-    history = history[history[TIMESTAMP_COLUMN] < issue_ts].copy()
-    if history.empty:
-        raise ValueError(
-            "Supabase live inference found no training history older than issue time "
-            f"{issue_ts} for target timestamp {timestamp_str}."
-        )
     bt.logging.info(
         "[LIVE_ROW] "
         f"requested_timestamp={timestamp_str} "
-        f"issue_timestamp={issue_ts} "
         f"requested_horizon_min={horizon} "
         f"selected_dt={forecast_row.get(TIMESTAMP_COLUMN)} "
         f"selected_horizon_min={forecast_row.get('horizon_min')}"
@@ -759,10 +895,6 @@ def predict_for_timestamp_with_context(
         pred = predict_linear(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
     elif result.model_type == "cart":
         pred = predict_cart(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
-    elif result.model_type == "rf":
-        pred = predict_rf(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
-    elif result.model_type == "hgb":
-        pred = predict_hgb(result.model_bundle, test_features[result.features].astype(float).to_numpy())[0]
     elif result.model_type == "lstm":
         n_steps = int(getattr(result.model_bundle, "n_steps", 12))
         seq = _build_live_sequence_matrix(
@@ -817,12 +949,6 @@ def persist_training_result(
     elif result.model_type == "cart":
         model_rel = "model_cart.joblib"
         save_cart(result.model_bundle, str(out_dir / model_rel))
-    elif result.model_type == "rf":
-        model_rel = "model_rf.joblib"
-        save_rf(result.model_bundle, str(out_dir / model_rel))
-    elif result.model_type == "hgb":
-        model_rel = "model_hgb.joblib"
-        save_hgb(result.model_bundle, str(out_dir / model_rel))
     elif result.model_type == "lstm":
         model_rel = "model_lstm.keras"
         save_lstm(result.model_bundle, str(out_dir / model_rel))
@@ -861,8 +987,6 @@ def persist_training_result(
         "features": result.features,
         "features_count": len(result.features),
         "feature_signature": feature_signature(result.features),
-        "forecast_horizon_min": int(result.forecast_horizon_min),
-        "horizon_steps": int(result.horizon_steps),
         "train_rows": int(len(result.train_frame)),
         "metrics": result.metrics,
         "durations_sec": result.durations_sec,
@@ -911,10 +1035,6 @@ def load_training_bundle_from_manifest(manifest_path: str):
         return load_linear(model_path)
     if model_type == "cart":
         return load_cart(model_path)
-    if model_type == "rf":
-        return load_rf(model_path)
-    if model_type == "hgb":
-        return load_hgb(model_path)
     if model_type == "lstm":
         n_steps_lstm = int(manifest.get("lstm_n_steps", 12))
         scaler_path: str | None = None

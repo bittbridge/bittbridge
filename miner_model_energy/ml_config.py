@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import yaml
 
-from .features import DEFAULT_LAGS, KNOWN_WEATHER_SUFFIXES, MIN_LOAD_LAG_STEPS
+from .features import KNOWN_WEATHER_SUFFIXES
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,6 @@ FEATURE_BOOL_KEYS = (
     "use_time_features",
     "use_cyclical_features",
     "use_station_agg_features",
-    "use_weather_aggregate_nonlinear_features",
     "use_temp_dew_gap",
     "use_load_lags",
     "use_load_rolling",
@@ -45,7 +44,7 @@ def _clean_optional_str(value: Any) -> str | None:
 
 
 def _normalize_include_weather_suffix_groups(value: Any) -> List[str]:
-    """Empty list = strip all raw *-tmpf / *-dwpf / ... columns. Non-empty = whitelist those suffixes only."""
+    """Empty list = strip all raw *-tmpf / *-dwpf / … columns. Non-empty = whitelist those suffixes only."""
     if value is None:
         return []
     if not isinstance(value, list):
@@ -111,7 +110,7 @@ def _normalize_keras_sequence_model(models: Dict[str, Any], yaml_key: str) -> No
     if cfg["dense_units"] < 0:
         raise ValueError(
             f"`models.{yaml_key}.dense_units` must be >= 0 "
-            f"(0 = no hidden Dense, only recurrent -> Dropout -> Dense(1))."
+            f"(0 = no hidden Dense, only recurrent → Dropout → Dense(1))."
         )
     cfg["use_early_stopping"] = bool(cfg.get("use_early_stopping", True))
     cfg["early_stopping_patience"] = int(cfg.get("early_stopping_patience", 5))
@@ -213,23 +212,11 @@ def load_model_config(path: str) -> ModelConfig:
     for key in FEATURE_BOOL_KEYS:
         features[key] = bool(features.get(key, False))
 
-    default_lags = list(DEFAULT_LAGS)
+    default_lags = [1, 2, 3, 6, 12]
     default_rolling = [3, 6, 12, 24]
     features["load_lag_steps"] = _as_int_list(
         features.get("load_lag_steps"), "features.load_lag_steps", default_lags
     )
-    # Load lags are relative to the prediction issue time t, not the future target
-    # timestamp t + forecast_horizon_min. A 12-row lag is therefore known history
-    # at issue time on 5-minute data, while zero or negative lags would leak current
-    # or future demand into the feature set.
-    if features.get("use_load_lags", False):
-        invalid_lags = [lag for lag in features["load_lag_steps"] if int(lag) < MIN_LOAD_LAG_STEPS]
-        if invalid_lags:
-            raise ValueError(
-                "`features.load_lag_steps` contains invalid lag(s) "
-                f"{invalid_lags}; load lags are known past-demand rows relative to "
-                f"prediction issue time t and must be >= {MIN_LOAD_LAG_STEPS}."
-            )
     features["rolling_load_windows"] = _as_int_list(
         features.get("rolling_load_windows"),
         "features.rolling_load_windows",
@@ -246,6 +233,11 @@ def load_model_config(path: str) -> ModelConfig:
     persistence["artifact_dir"] = str(artifact_path)
     persistence["config_file"] = str(cfg_path.resolve())
     persistence["save_on_deploy"] = bool(persistence.get("save_on_deploy", True))
+    persistence["plugin_folder_name"] = _clean_optional_str(persistence.get("plugin_folder_name"))
+    fb = str(persistence.get("custom_model_fallback_default", "baseline")).strip().lower()
+    if fb not in {"baseline", "exit", "train_builtin"}:
+        fb = "baseline"
+    persistence["custom_model_fallback_default"] = fb
 
     return ModelConfig(
         data=data,
